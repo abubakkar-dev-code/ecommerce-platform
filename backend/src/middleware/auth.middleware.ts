@@ -22,14 +22,11 @@ export const authenticate = (
 ) => {
   const authHeader = req.headers.authorization;
   try {
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
       throw new ApiError(401, "Authentication token is required");
     }
     const token = authHeader.split(" ")[1];
-    console.log("Token:", token);
-    console.log("JWT_SECRET:", env.JWT_SECRET);
     const decoded = jwt.verify(token, env.JWT_SECRET) as jwtPayload;
-    console.log("Decoded:", decoded);
     req.user = decoded;
     next();
   } catch (error) {

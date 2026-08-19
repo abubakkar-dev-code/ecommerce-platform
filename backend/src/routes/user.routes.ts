@@ -35,6 +35,6 @@ router.get(
   googleCallback,
 );
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
-export default router;
 router.put("/reset-password", resetPassword);
-router.post("/logout",logout);
+router.post("/logout", logout);
+export default router;
