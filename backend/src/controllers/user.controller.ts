@@ -7,6 +7,8 @@ import { generateToken } from "../utils/jwt";
 import crypto from "crypto";
 import AuthToken from "../models/authToken";
 import { passwordResetLink } from "../services/sendmail";
+import { resetTokenGeneration } from "../config/resetTokenGeneration";
+import { resetTokenHash } from "../config/resetTokenHash";
 
 export const registerUser = async (
   req: Request,
@@ -190,11 +192,8 @@ export const forgotPassword = async (
         );
       return;
     }
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    const resetToken = resetTokenGeneration();
+    const hashedToken = resetTokenHash(resetToken);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await AuthToken.create({
       userId: user._id,
@@ -231,7 +230,7 @@ export const resetPassword = async (
     if (newPassword != confirmPassword) {
       throw new ApiError(400, "Password do not match");
     }
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const hashedToken = resetTokenHash(token);
     const resetRecord = await AuthToken.findOne({ token: hashedToken });
     if (!resetRecord) {
       throw new ApiError(400, "no records found");
@@ -254,6 +253,6 @@ export const resetPassword = async (
     next(error);
   }
 };
-export const logout = (_req: Request, res: Response):void => {
+export const logout = (_req: Request, res: Response): void => {
   res.status(200).json(new ApiResponse("Logout successfull"));
 };
