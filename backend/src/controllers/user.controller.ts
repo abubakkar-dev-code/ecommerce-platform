@@ -4,7 +4,6 @@ import User, { IUser } from "../models/user.model";
 import bcrypt from "bcryptjs";
 import ApiResponse from "../utils/api-response";
 import { generateToken } from "../utils/jwt";
-import crypto from "crypto";
 import AuthToken from "../models/authToken";
 import { passwordResetLink } from "../services/sendmail";
 import { resetTokenGeneration } from "../config/resetTokenGeneration";
