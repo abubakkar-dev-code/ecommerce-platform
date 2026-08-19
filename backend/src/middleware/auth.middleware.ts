@@ -1,7 +1,7 @@
 declare global {
   namespace Express {
     interface Request {
-      user: {
+      user?: {
         userId: string;
       };
     }
@@ -17,7 +17,7 @@ import { env } from "../config/env";
 
 export const authenticate = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) => {
   const authHeader = req.headers.authorization;

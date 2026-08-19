@@ -1,10 +1,11 @@
 import mongoose, { Document, Schema } from "mongoose";
-interface IUser extends Document {
+export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
   role: "customer" | "admin";
   isActive: boolean;
+  googleId: string;
 }
 
 const userSchema = new Schema<IUser>(
@@ -23,7 +24,7 @@ const userSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
       minLength: 8,
     },
     role: {
@@ -34,6 +35,11 @@ const userSchema = new Schema<IUser>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
     },
   },
   {
