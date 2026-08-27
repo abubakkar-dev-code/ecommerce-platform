@@ -2,6 +2,7 @@ import express from "express";
 import {
   createBrand,
   deleteBrand,
+  getBrandById,
   getBrands,
   updateBrand,
 } from "../controllers/brand.controller";
@@ -10,8 +11,9 @@ import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
 router.get("/", getBrands);
+router.get("/:id", getBrandById);
 router.post("/create-brand", authenticate, authorize("admin"), createBrand);
 router.patch("/:id", authenticate, authorize, updateBrand);
-router.delete("/:id",deleteBrand);
+router.delete("/:id", deleteBrand);
 
 export default router;

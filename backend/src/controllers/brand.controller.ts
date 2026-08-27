@@ -30,7 +30,7 @@ export const createBrand = async (
   }
 };
 export const getBrands = async (
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
@@ -42,6 +42,22 @@ export const getBrands = async (
     res
       .status(200)
       .json(new ApiResponse("Brands details fetched successfully", brands));
+  } catch (error) {
+    next(error);
+  }
+};
+export const getBrandById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const brand = await Brand.findById(id);
+    if (!brand) {
+      throw new ApiError(404, "Brand not found");
+    }
+    res.status(200).json(new ApiResponse("Brand fetched successfully", brand));
   } catch (error) {
     next(error);
   }
@@ -85,6 +101,7 @@ export const updateBrand = async (
     next(error);
   }
 };
+
 export const deleteBrand = async (
   req: Request,
   res: Response,
