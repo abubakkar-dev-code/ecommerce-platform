@@ -11,8 +11,6 @@ import { authorize } from "../middleware/authorize.middleware";
 const router = express.Router();
 router.post(
   "/create-category",
-  authenticate,
-  authorize("admin"),
   createCategory,
 );
 router.get("/", getCategories);

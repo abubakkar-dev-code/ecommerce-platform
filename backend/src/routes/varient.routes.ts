@@ -9,9 +9,9 @@ import {
 const router = express.Router();
 
 router.post("/create-varient", createProductVariant);
-router.get("/get-varient", getVarient);
-router.get("/get-varient/:id", getVrientById);
-router.patch("/update-varient", updatevarient);
-router.delete("/delete-varient", deleteVarient);
+router.get("/:id", getVarient);
+router.get("/getSingleVarient/:id", getVrientById);
+router.patch("/:id", updatevarient);
+router.delete("/:id", deleteVarient);
 
 export default router;

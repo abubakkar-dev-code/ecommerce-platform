@@ -59,15 +59,14 @@ export const getVarient = async (
   next: NextFunction,
 ) => {
   try {
-    const { productId } = req.params;
-    const product = await Product.findById(productId);
+    const { id } = req.params;
+    const product = await Product.findById(id);
     if (!product) {
       throw new ApiError(404, "Product not found");
     }
     const varients = await Varient.find({
-      product: product._id,
-      isActive: true,
-    });
+    product: product._id
+    }).where({ isActive: true });
     if (varients.length === 0) {
       throw new ApiError(404, "No varients found for this product");
     }
@@ -84,8 +83,8 @@ export const getVrientById = async (
   next: NextFunction,
 ) => {
   try {
-    const { varientId } = req.params;
-    const varient = await Varient.findById(varientId);
+    const { id } = req.params;
+    const varient = await Varient.findById(id);
     if (!varient) {
       throw new ApiError(404, "sorry varient not available");
     }
@@ -102,12 +101,12 @@ export const updatevarient = async (
   next: NextFunction,
 ) => {
   try {
-    const { varientId } = req.params;
+    const { id } = req.params;
     const { attributes, price, comparedAt, isActive } = req.body;
     if (!attributes && !price && !isActive) {
       throw new ApiError(400, "please enter the required fields");
     }
-    const exisitngVarient = await Varient.findById(varientId);
+    const exisitngVarient = await Varient.findById(id);
     if (!exisitngVarient) {
       throw new ApiError(404, "varient doesn't exist");
     }
@@ -138,8 +137,8 @@ export const deleteVarient = async (
   next: NextFunction,
 ) => {
   try {
-    const { varientId } = req.params;
-    const varient = await Varient.findById(varientId);
+    const { id } = req.params;
+    const varient = await Varient.findById(id);
     if (!varient) {
       throw new ApiError(404, "varient not found");
     }
@@ -147,7 +146,8 @@ export const deleteVarient = async (
       throw new ApiError(400, "varient is already in deactivated state");
     }
     varient.isActive = false;
-    res.status(200).json(new ApiResponse("product deactivated successfully"));
+    await varient.save()
+    res.status(200).json(new ApiResponse("product deactivated successfully",varient));
   } catch (error) {
     next(error);
   }
