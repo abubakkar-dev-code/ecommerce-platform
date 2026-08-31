@@ -7,6 +7,8 @@ import brandRoutes from "./routes/brand.routes";
 import productRoutes from "./routes/product.routes";
 import varientRoutes from "./routes/varient.routes";
 import inventoryRoutes from "./routes/inventory.routes";
+import imageRoutes from "./routes/imageUploads.route";
+
 const app = express();
 app.use(express.json());
 app.use("/api/users", userRoutes);
@@ -15,6 +17,7 @@ app.use("/api/brands", brandRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/varients", varientRoutes);
 app.use("/api/inventories", inventoryRoutes);
+app.use("/api/product-images", imageRoutes);
 app.use(notFound);
 app.use(errorMiddleware);
 export default app;

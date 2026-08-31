@@ -73,6 +73,30 @@ export const getProducts = async (
     next(error);
   }
 };
+
+export const seachProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { search } = req.query as {search?:string};
+    if (!search) {
+      throw new ApiError(400, "please provide the search value");
+    }
+     const products = await Product.find({
+      isActive: true,
+      $or: [
+        { name: { $regex: search, $options: "i" } },
+        { slug: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ],
+    });
+    res.status(200).json(new ApiResponse("Products fetched successfully", products));
+  } catch (error) {
+    next(error);
+  }
+};
 export const getSingleProduct = async (
   req: Request,
   res: Response,
