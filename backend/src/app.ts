@@ -9,6 +9,7 @@ import varientRoutes from "./routes/varient.routes";
 import inventoryRoutes from "./routes/inventory.routes";
 import imageRoutes from "./routes/imageUploads.route";
 import cartRoutes from "./routes/cart.routes";
+import wishRoutes from "./routes/whishList.routes";
 
 const app = express();
 app.use(express.json());
@@ -20,6 +21,7 @@ app.use("/api/varients", varientRoutes);
 app.use("/api/inventories", inventoryRoutes);
 app.use("/api/product-images", imageRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/wishList", wishRoutes);
 app.use(notFound);
 app.use(errorMiddleware);
 export default app;
