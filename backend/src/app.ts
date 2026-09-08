@@ -8,6 +8,7 @@ import productRoutes from "./routes/product.routes";
 import varientRoutes from "./routes/varient.routes";
 import inventoryRoutes from "./routes/inventory.routes";
 import imageRoutes from "./routes/imageUploads.route";
+import cartRoutes from "./routes/cart.routes";
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/varients", varientRoutes);
 app.use("/api/inventories", inventoryRoutes);
 app.use("/api/product-images", imageRoutes);
+app.use("/api/cart", cartRoutes);
 app.use(notFound);
 app.use(errorMiddleware);
 export default app;

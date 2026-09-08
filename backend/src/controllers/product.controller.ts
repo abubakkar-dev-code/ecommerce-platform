@@ -224,15 +224,26 @@ export const filterProducts = async (
   next: NextFunction,
 ) => {
   try {
-    const { brand, category, minPrice, maxPrice, sort } = req.query as {
+    const {
+      brand,
+      category,
+      minPrice,
+      maxPrice,
+      sort,
+      page = "1",
+      limit = "10",
+    } = req.query as {
       brand?: string;
       category?: string;
       minPrice?: string;
       maxPrice?: string;
       sort?: string;
+      page?: string;
+      limit?: string;
     };
     const min = minPrice ? Number(minPrice) : undefined;
     const max = maxPrice ? Number(maxPrice) : undefined;
+
     const filter: any = {
       isActive: true,
     };
@@ -273,11 +284,25 @@ export const filterProducts = async (
     if (sort === "oldest") {
       sortOption.createdAt = 1;
     }
-    const filteredProducts = await Product.find(filter).sort(sortOption);
+    const currentPage = Number(page);
+    const itemsPerPage = Number(limit);
+    const skip = (currentPage - 1) * itemsPerPage;
+    const totalProducts = await Product.countDocuments(filter);
+    const totalPages = Math.ceil(totalProducts / itemsPerPage);
+    const filteredProducts = await Product.find(filter)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(itemsPerPage);
+    const pagination = {
+      currentPage,
+      totalPages,
+      itemsPerPage,
+      totalProducts,
+    };
     res
       .status(200)
       .json(
-        new ApiResponse("Products filtered successfully", filteredProducts),
+        new ApiResponse("Products filtered successfully", filteredProducts,pagination),
       );
   } catch (error) {
     next(error);

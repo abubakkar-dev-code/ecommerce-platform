@@ -36,5 +36,5 @@ const productVarientSchema = new Schema(
     timestamps: true,
   },
 );
-const Varient = mongoose.model("Variant", productVarientSchema);
+const Varient = mongoose.model("Varient", productVarientSchema);
 export default Varient;
