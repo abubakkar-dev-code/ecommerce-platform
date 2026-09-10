@@ -102,3 +102,26 @@ export const removeWishList = async (
     next(error);
   }
 };
+export const clearWishList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new ApiError(400, "Unauthorized,please login to access");
+    }
+    const wishList = await WishList.findOne({ user: userId });
+    if (!wishList) {
+      throw new ApiError(400, "WishList is Empty");
+    }
+    wishList.products = [];
+    await wishList.save();
+    res
+      .status(200)
+      .json(new ApiResponse("WishList cleared successfully", wishList));
+  } catch (error) {
+    next(error);
+  }
+};

@@ -17,6 +17,8 @@ const requiredEnvVariables = [
   "AWS_SECRET_ACCESS_KEY",
   "AWS_REGION",
   "AWS_S3_BUCKET_NAME",
+  "RAZOR_PAY_KEY",
+  "RAZOR_PAY_SECRET",
 ];
 
 for (const variable of requiredEnvVariables) {
@@ -42,4 +44,6 @@ export const env = {
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   AWS_REGION: process.env.AWS_REGION,
   AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+  RAZOR_PAY_KEY: process.env.RAZOR_PAY_KEY,
+  RAZOR_PAY_SECRET: process.env.RAZOR_PAY_SECRET,
 };
