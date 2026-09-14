@@ -165,10 +165,11 @@ export const updatePassword = async (
 export const googleCallback = (req: Request, res: Response): void => {
   const user = req.user as unknown as IUser;
   const token = generateToken(user!._id.toString());
-  res.json({
-    message: "Google authentication successful",
-    token,
-  });
+  res.redirect(`http://localhost:5173/google-success?token=${token}`);
+  // res.json({
+  //   message: "Google authentication successful",
+  //   token,
+  // });
 };
 export const forgotPassword = async (
   req: Request,
