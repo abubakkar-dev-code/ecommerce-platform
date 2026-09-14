@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import authService from "../../services/auth.service";
+import toast from "react-hot-toast";
 
 const ForgotPassword = () => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -11,10 +11,11 @@ const ForgotPassword = () => {
       const response = await authService.forgotPassword({ email });
       console.log(response);
       if (response) {
-        console.log(`reset-link should be senton gamil`)
+        toast.success(response.message);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      toast.error(error.response.data.message);
     }
   };
   return (

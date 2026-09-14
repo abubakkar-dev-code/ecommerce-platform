@@ -4,6 +4,7 @@ import { setCredentials } from "../../redux/slices/auth.slice";
 import { Link } from "react-router-dom";
 import GoogleButton from "../../components/GoogleButton";
 import { useAppDispatch } from "../../redux/hooks";
+import toast from "react-hot-toast";
 
 const Login = () => {
   const dispatch = useAppDispatch();
@@ -33,6 +34,7 @@ const Login = () => {
     try {
       const response = await authService.login(formData);
       if (response) {
+        toast.success("Login successfull");
         console.log("resposne", response);
 
         localStorage.setItem("token", response.data.token);

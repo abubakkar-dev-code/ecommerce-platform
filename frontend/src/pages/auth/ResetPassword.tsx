@@ -1,6 +1,7 @@
 import { useState } from "react";
 import authService from "../../services/auth.service";
 import { useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -20,10 +21,10 @@ const ResetPassword = () => {
     try {
       const response = await authService.resetPassword(formData, token);
       if (response.success) {
-        console.log(response);
+        toast.success("Password reset successful");
       }
     } catch (error) {
-      console.log(error);
+      toast.error(error.response.data.message)
     }
   };
   return (

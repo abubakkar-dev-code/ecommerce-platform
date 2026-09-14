@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import{ useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAppDispatch } from "../../redux/hooks";
 import { setCredentials } from "../../redux/slices/auth.slice";
-import api from "../../services/api";
+
 import authService from "../../services/auth.service";
 
 const GoogleSuccess = () => {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/auth.service";
 import GoogleButton from "../../components/GoogleButton";
+import toast from "react-hot-toast";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -25,7 +26,8 @@ const Register = () => {
     try {
       const response = await authService.register(formData);
       if (response) {
-        navigate("/");
+        toast.success("Account created successfully");
+        navigate("/login");
       }
     } catch (error) {
       console.log(error?.response.data.message);
@@ -104,7 +106,7 @@ const Register = () => {
         <p className="mt-6 text-center text-sm text-muted">
           Already have an account?{" "}
           <Link
-            to="/"
+            to="/login"
             className="cursor-pointer font-medium text-primary hover:underline"
           >
             Login
