@@ -46,7 +46,7 @@ export const loginUser = async (
     }
     const user = await User.findOne({ email });
     if (!user) {
-      throw new ApiError(401, "user not found");
+      throw new ApiError(400, "user not found");
     }
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
@@ -199,7 +199,7 @@ export const forgotPassword = async (
       token: hashedToken,
       expiresAt,
     });
-    const resetLink = `http://localhost:5000/api/users/reset-password?token=${resetToken}`;
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
     await passwordResetLink(user.email, resetLink);
     res
       .status(200)

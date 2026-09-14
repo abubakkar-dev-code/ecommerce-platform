@@ -13,8 +13,14 @@ import wishRoutes from "./routes/whishList.routes";
 import addressRoutes from "./routes/address.routes";
 import orderRoutes from "./routes/order.routes";
 import paymentRoutes from "./routes/payment.route";
+import cors from "cors";
 
 const app = express();
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+  }),
+);
 app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/categories", categoryRoutes);
