@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/auth.service";
+import GoogleButton from "../../components/GoogleButton";
 
 const Register = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -18,13 +21,17 @@ const Register = () => {
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const response = await authService.register(formData);
       if (response) {
         navigate("/");
       }
     } catch (error) {
-      console.log(error?.message);
+      console.log(error?.response.data.message);
+      setError(error?.response.data.message);
+    } finally {
+      setLoading(false);
     }
   };
   return (
@@ -83,12 +90,15 @@ const Register = () => {
               className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
             />
           </div>
+          {error && <p className="text-sm text-error">{error}</p>}
           <button
             type="submit"
+            disabled={loading}
             className="w-full rounded-lg bg-primary py-3 font-medium text-white hover:bg-primary-hover"
           >
-            Create Account
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
+          <GoogleButton />
         </form>
 
         <p className="mt-6 text-center text-sm text-muted">

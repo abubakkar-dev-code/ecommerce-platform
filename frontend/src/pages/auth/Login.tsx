@@ -1,11 +1,14 @@
 import { useState } from "react";
 import authService from "../../services/auth.service";
-import { useAppDispatch } from "../../redux/hooks";
 import { setCredentials } from "../../redux/slices/auth.slice";
 import { Link } from "react-router-dom";
+import GoogleButton from "../../components/GoogleButton";
+import { useAppDispatch } from "../../redux/hooks";
 
 const Login = () => {
   const dispatch = useAppDispatch();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,6 +23,13 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.email || !formData.password) {
+      setError("Please fill in all fields");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
     try {
       const response = await authService.login(formData);
       if (response) {
@@ -34,7 +44,12 @@ const Login = () => {
         );
       }
     } catch (error) {
-      console.log(error.message);
+      (setError(
+        error.response?.data?.message || "Login failed. Please try again.",
+      ),
+        console.log(error.message));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,13 +92,15 @@ const Login = () => {
               className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
             />
           </div>
-
+          {error && <p className="text-sm text-error">{error}</p>}
           <button
             type="submit"
+            disabled={loading}
             className="w-full rounded-lg bg-primary py-3 font-medium text-white hover:bg-primary-hover"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
+          <GoogleButton />
           <p className="mt-3 text-center text-muted text-sm">
             Don't have an account?{" "}
             <Link

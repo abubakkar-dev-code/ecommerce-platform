@@ -11,6 +11,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
+  error: string | null;
 }
 
 const initialState: AuthState = {
@@ -18,6 +19,7 @@ const initialState: AuthState = {
   token: null,
   isAuthenticated: false,
   loading: false,
+  error: null,
 };
 const authSlice = createSlice({
   name: "auth",
@@ -28,6 +30,12 @@ const authSlice = createSlice({
         (state.token = action.payload.token),
         (state.isAuthenticated = true));
     },
+    setLoading: (state, action) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action) => {
+      state.error = action.payload;
+    },
     logout: (state) => {
       state.user = null;
       state.token = null;
@@ -36,5 +44,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, setLoading, setError, logout } =
+  authSlice.actions;
 export default authSlice.reducer;

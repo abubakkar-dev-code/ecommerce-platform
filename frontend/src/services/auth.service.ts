@@ -33,4 +33,10 @@ const resetPassword = async (data: reset, token: string) => {
   const response = await api.put(`/users/reset-password?token=${token}`, data);
   return response.data;
 };
-export default { login, register, forgotPassword, resetPassword };
+
+const userProfile = async () => {
+  const response = await api.get(`/users/profile`);
+  return response.data;
+};
+
+export default { login, register, forgotPassword, resetPassword, userProfile };
