@@ -18,7 +18,7 @@ import cors from "cors";
 const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://ecommerce-platform-lyart-iota.vercel.app",
+  "https://ecommerce-platform-five-liard.vercel.app",
 ];
 app.use(
   cors({
