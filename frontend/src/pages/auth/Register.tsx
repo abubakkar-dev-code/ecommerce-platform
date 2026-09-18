@@ -29,9 +29,9 @@ const Register = () => {
         toast.success("Account created successfully");
         navigate("/login");
       }
-    } catch (error) {
-      console.log(error?.response.data.message);
-      setError(error?.response.data.message);
+    } catch (error:any) {
+      console.log(error.message);
+      setError(error.message);
     } finally {
       setLoading(false);
     }

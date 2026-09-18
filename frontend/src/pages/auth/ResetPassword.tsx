@@ -18,13 +18,17 @@ const ResetPassword = () => {
   };
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!token) {
+      toast.error("Invalid or missing reset token");
+      return;
+    }
     try {
       const response = await authService.resetPassword(formData, token);
       if (response.success) {
         toast.success("Password reset successful");
       }
-    } catch (error) {
-      toast.error(error.response.data.message)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to reset password");
     }
   };
   return (

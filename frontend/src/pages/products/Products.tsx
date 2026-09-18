@@ -2,27 +2,30 @@ import { useEffect, useState } from "react";
 import ProductCard from "../../components/product/ProductCard";
 import productService from "../../services/product.service";
 import { Link } from "react-router-dom";
+import type { Product } from "../../types";
+
 const Products = () => {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+        setError("");
         const response = await productService.getproducts();
-        setProducts(response.data);
-        setLoading(false);
-      } catch (error) {
-        console.log(error);
-        setError("Failed to fetch products");
+        setProducts(response.data || []);
+      } catch (err: any) {
+        console.log(err);
+        setError(err?.response?.data?.message || "Failed to fetch products");
       } finally {
         setLoading(false);
       }
     };
     fetchProducts();
   }, []);
-  console.log("products", products);
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
       {/* Page Header */}
@@ -31,6 +34,12 @@ const Products = () => {
 
         <p className="mt-2 text-muted">Explore our collection of products.</p>
       </div>
+
+      {error && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-error border border-red-200">
+          {error}
+        </div>
+      )}
 
       {/* Products Page Content */}
       <div className="flex flex-col gap-8 lg:flex-row">
@@ -134,7 +143,9 @@ const Products = () => {
         {/* Product Area */}
         <section className="flex-1">
           <div className="mb-6 flex items-center justify-between">
-            <p className="text-sm text-muted">Showing products</p>
+            <p className="text-sm text-muted">
+              {loading ? "Loading products..." : `Showing ${products.length} products`}
+            </p>
 
             <select
               className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text outline-none transition focus:border-primary"
@@ -151,19 +162,32 @@ const Products = () => {
           </div>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((product) => (
-              <Link to={`/products/${product?._id}`}>
-                <ProductCard
-                  key={product._id}
-                  name={product.name}
-                  image={product.images}
-                  price={product.variants[0]?.price}
-                  comparedAt={product.variants[0]?.comparedAt}
-                />
-              </Link>
-            ))}
-          </div>
+          {loading && products.length === 0 ? (
+            <div className="flex min-h-[300px] items-center justify-center">
+              <p className="text-muted">Loading products...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((product) => {
+                const primaryImage =
+                  product.images?.[0]?.image ||
+                  "https://placehold.co/400x400?text=" + encodeURIComponent(product.name);
+                const firstVariant = product.variants?.[0];
+
+                return (
+                  <Link key={product._id} to={`/products/${product._id}`}>
+                    <ProductCard
+                      name={product.name}
+                      image={primaryImage}
+                      price={firstVariant?.price || 0}
+                      comparedAt={firstVariant?.comparedAt}
+                    />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           <div className="mt-10 flex items-center justify-center gap-2">
             <button
               type="button"

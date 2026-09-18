@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import addressService from "../../services/address.service";
+import toast from "react-hot-toast";
 
 const Checkout = () => {
   const [loading, setLoading] = useState(false);
@@ -17,15 +18,24 @@ const Checkout = () => {
     country: "India",
   });
 
-  const [address, setAddress] = useState(null);
-
   useEffect(() => {
     const fetchAddress = async () => {
       try {
         const response = await addressService.getAddress();
-        setAddress(response.data);
-      } catch (error: any) {
-        setError(error.message);
+        if (response.data) {
+          setFormData({
+            fullName: response.data.fullName || "",
+            phone: response.data.phone || "",
+            addressLine1: response.data.addressLine1 || "",
+            addressLine2: response.data.addressLine2 || "",
+            city: response.data.city || "",
+            state: response.data.state || "",
+            pincode: response.data.pincode || "",
+            country: response.data.country || "India",
+          });
+        }
+      } catch (err: any) {
+        console.log(err?.response?.data?.message || err.message);
       }
     };
 
@@ -35,10 +45,10 @@ const Checkout = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,14 +56,13 @@ const Checkout = () => {
 
     try {
       setLoading(true);
+      setError("");
 
       const response = await addressService.createOrUpdateAddress(formData);
-
-      setAddress(response.data);
-
       console.log(response.data);
-    } catch (err) {
-      setError("Failed to place order");
+      toast.success("Address saved successfully");
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -70,6 +79,12 @@ const Checkout = () => {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-error border border-red-200">
+          {error}
+        </div>
+      )}
+
       {/* Checkout Layout */}
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Left Section */}
@@ -83,7 +98,7 @@ const Checkout = () => {
             <p className="mt-1 text-sm text-muted">
               Enter the address where you want your order delivered.
             </p>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} id="address-form">
               <div className="mt-6 grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-text">
@@ -212,6 +227,16 @@ const Checkout = () => {
                   />
                 </div>
               </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover disabled:opacity-50"
+                >
+                  {loading ? "Saving Address..." : "Save Address"}
+                </button>
+              </div>
             </form>
           </div>
 
@@ -303,12 +328,12 @@ const Checkout = () => {
           </div>
 
           {/* Place Order */}
-          <button
-            type="submit"
-            className="mt-6 w-full rounded-md bg-primary px-6 py-3 font-medium text-white transition hover:bg-primary-hover"
+          <Link
+            to="/orders"
+            className="mt-6 block w-full text-center rounded-md bg-primary px-6 py-3 font-medium text-white transition hover:bg-primary-hover"
           >
-            <Link to="/orders">Place Order & Pay</Link>
-          </button>
+            Place Order & Pay
+          </Link>
 
           <p className="mt-3 text-center text-xs text-muted">
             Your payment will be securely processed.
