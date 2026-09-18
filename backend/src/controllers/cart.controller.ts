@@ -16,58 +16,96 @@ export const createCart = async (
       productId: string;
       varientId: string;
     };
+
+    const { quantity } = req.body;
     const userId = req.user?.userId;
+
     if (!userId) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError(401, "Please login to add items to cart");
     }
+
     if (!productId || !varientId) {
       throw new ApiError(400, "productId and varientId are missing");
     }
+
+    if (!quantity || quantity < 1) {
+      throw new ApiError(400, "Quantity must be at least 1");
+    }
+
     const product = await Product.findById(productId);
+
     if (!product) {
-      throw new ApiError(404, "product not found");
+      throw new ApiError(404, "Product not found");
     }
+
     const varient = await Varient.findById(varientId);
+
     if (!varient) {
-      throw new ApiError(404, "varient not found");
+      throw new ApiError(404, "Varient not found");
     }
+
     if (varient.product.toString() !== productId) {
-      throw new ApiError(400, "varient doesn't belong to this product");
+      throw new ApiError(400, "Varient doesn't belong to this product");
     }
-    const inventoryDetails = await Inventory.findOne({ varient: varientId });
+
+    const inventoryDetails = await Inventory.findOne({
+      varient: varientId,
+    });
+
     if (!inventoryDetails) {
       throw new ApiError(404, "Inventory details not found");
     }
-    if (inventoryDetails?.quantity < 1) {
-      throw new ApiError(400, "Product out of stock");
+
+    if (inventoryDetails.quantity < quantity) {
+      throw new ApiError(
+        400,
+        `Only ${inventoryDetails.quantity} items are available`,
+      );
     }
+
     const productPrice = varient.price;
+
     const orderedItems = {
       product: productId,
       varient: varientId,
-      quantity: 1,
+      quantity,
       price: productPrice,
     };
 
     let cart = await Cart.findOne({ user: userId });
+
     if (!cart) {
       cart = await Cart.create({
         user: userId,
         items: [orderedItems],
       });
+
       res.status(201).json(new ApiResponse("Added to cart successfully", cart));
+
       return;
-    } else {
-      const existingItem = cart.items.find(
-        (item) => item.varient.toString() === varientId,
-      );
-      if (existingItem) {
-        existingItem.quantity += 1;
-      } else {
-        cart.items.push(orderedItems);
-      }
     }
-    await cart?.save();
+
+    const existingItem = cart.items.find(
+      (item) => item.varient.toString() === varientId,
+    );
+
+    if (existingItem) {
+      const newQuantity = existingItem.quantity + quantity;
+
+      if (newQuantity > inventoryDetails.quantity) {
+        throw new ApiError(
+          400,
+          `Only ${inventoryDetails.quantity} items are available`,
+        );
+      }
+
+      existingItem.quantity = newQuantity;
+    } else {
+      cart.items.push(orderedItems);
+    }
+
+    await cart.save();
+
     res.status(201).json(new ApiResponse("Added to cart successfully", cart));
   } catch (error) {
     next(error);

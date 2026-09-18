@@ -5,6 +5,7 @@ import Category from "../models/category.model";
 import Brand from "../models/brand.model";
 import ApiResponse from "../utils/api-response";
 import Varient from "../models/productVariant.model";
+import ProductImage from "../models/productImageSchema";
 
 export const createProduct = async (
   req: Request,
@@ -64,12 +65,36 @@ export const getProducts = async (
 ) => {
   try {
     const products = await Product.find();
-    if (!products) {
-      throw new ApiError(404, "theres no products");
+
+    if (products.length === 0) {
+      throw new ApiError(404, "There are no products");
     }
+
+    const productsWithDetails = await Promise.all(
+      products.map(async (product) => {
+        const variants = await Varient.find({
+          product: product._id,
+          isActive: true,
+        });
+
+        const images = await ProductImage.find({
+          product: product._id,
+          isActive: true,
+        }).sort({ sortOrder: 1 });
+
+        return {
+          ...product.toObject(),
+          variants,
+          images,
+        };
+      }),
+    );
+
     res
       .status(200)
-      .json(new ApiResponse("Products fetched successfully", products));
+      .json(
+        new ApiResponse("Products fetched successfully", productsWithDetails),
+      );
   } catch (error) {
     next(error);
   }
@@ -153,13 +178,45 @@ export const getSingleProduct = async (
 ) => {
   try {
     const { id } = req.params;
+
     const product = await Product.findById(id);
+
     if (!product) {
       throw new ApiError(404, "Product not found");
     }
+
+    const variants = await Varient.find({
+      product: product._id,
+      isActive: true,
+    });
+
+    const images = await ProductImage.find({
+      product: product._id,
+      isActive: true,
+    }).sort({ sortOrder: 1 });
+    console.log(product, "product");
+    const categories = await Category.findOne({
+      _id: product.category,
+      isActive: true,
+    });
+    const brand = await Brand.findOne({
+      _id: product.brand,
+      isActive: true,
+    });
+
+    const productWithDetails = {
+      ...product.toObject(),
+      variants,
+      images,
+      categories,
+      brand,
+    };
+
     res
       .status(200)
-      .json(new ApiResponse("Product fetched successfully", product));
+      .json(
+        new ApiResponse("Product fetched successfully", productWithDetails),
+      );
   } catch (error) {
     next(error);
   }
@@ -302,7 +359,11 @@ export const filterProducts = async (
     res
       .status(200)
       .json(
-        new ApiResponse("Products filtered successfully", filteredProducts,pagination),
+        new ApiResponse(
+          "Products filtered successfully",
+          filteredProducts,
+          pagination,
+        ),
       );
   } catch (error) {
     next(error);

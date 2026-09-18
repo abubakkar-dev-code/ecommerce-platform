@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  createAddress,
+  createOrUpdateAddress,
   getAddress,
   removeAddress,
   updateAddress,
@@ -8,7 +8,7 @@ import {
 import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
-router.post("/", authenticate, createAddress);
+router.post("/", authenticate, createOrUpdateAddress);
 router.get("/", authenticate, getAddress);
 router.patch("/:addressId", authenticate, updateAddress);
 router.delete("/:addressId", authenticate, removeAddress);

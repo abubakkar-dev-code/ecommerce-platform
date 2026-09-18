@@ -3,17 +3,18 @@ import ApiError from "../utils/api-error";
 import Address from "../models/address.model";
 import ApiResponse from "../utils/api-response";
 
-export const createAddress = async (
+export const createOrUpdateAddress = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const userId = req.user?.userId;
-    console.log(userId)
+
     if (!userId) {
-      throw new ApiError(400, "Unauthorized,please login");
+      throw new ApiError(401, "Unauthorized, please login");
     }
+
     const {
       fullName,
       phone,
@@ -24,6 +25,7 @@ export const createAddress = async (
       country,
       isDefault,
     } = req.body;
+
     if (
       !fullName ||
       !phone ||
@@ -35,8 +37,9 @@ export const createAddress = async (
     ) {
       throw new ApiError(400, "All fields are required");
     }
-    const exisitngAddress = await Address.findOne({ user: userId });
-    if (!exisitngAddress) {
+
+    const existingAddress = await Address.findOne({ user: userId });
+    if (!existingAddress) {
       const address = await Address.create({
         user: userId,
         fullName,
@@ -46,10 +49,13 @@ export const createAddress = async (
         state,
         pincode,
         country,
+        isDefault: true,
       });
+
       res
         .status(201)
-        .json(new ApiResponse("Address details added successfully", address));
+        .json(new ApiResponse("Address added successfully", address));
+
       return;
     }
     if (isDefault === true) {
@@ -57,21 +63,23 @@ export const createAddress = async (
         { user: userId, isDefault: true },
         { $set: { isDefault: false } },
       );
-      const address = await Address.create({
-        user: userId,
-        fullName,
-        phone,
-        addressLine1,
-        city,
-        state,
-        pincode,
-        country,
-        isDefault,
-      });
-      res
-        .status(201)
-        .json(new ApiResponse("Address added successfully", address));
     }
+
+    const address = await Address.create({
+      user: userId,
+      fullName,
+      phone,
+      addressLine1,
+      city,
+      state,
+      pincode,
+      country,
+      isDefault: isDefault ?? false,
+    });
+
+    res
+      .status(201)
+      .json(new ApiResponse("Address added successfully", address));
   } catch (error) {
     next(error);
   }
