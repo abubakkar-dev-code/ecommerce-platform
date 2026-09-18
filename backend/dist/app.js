@@ -1,0 +1,41 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const not_found_middleware_1 = __importDefault(require("./middleware/not-found.middleware"));
+const error_middleware_1 = __importDefault(require("./middleware/error.middleware"));
+const user_routes_1 = __importDefault(require("./routes/user.routes"));
+const category_routes_1 = __importDefault(require("./routes/category.routes"));
+const brand_routes_1 = __importDefault(require("./routes/brand.routes"));
+const product_routes_1 = __importDefault(require("./routes/product.routes"));
+const varient_routes_1 = __importDefault(require("./routes/varient.routes"));
+const inventory_routes_1 = __importDefault(require("./routes/inventory.routes"));
+const imageUploads_route_1 = __importDefault(require("./routes/imageUploads.route"));
+const cart_routes_1 = __importDefault(require("./routes/cart.routes"));
+const whishList_routes_1 = __importDefault(require("./routes/whishList.routes"));
+const address_routes_1 = __importDefault(require("./routes/address.routes"));
+const order_routes_1 = __importDefault(require("./routes/order.routes"));
+const payment_route_1 = __importDefault(require("./routes/payment.route"));
+const cors_1 = __importDefault(require("cors"));
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)({
+    origin: "http://localhost:5173",
+}));
+app.use(express_1.default.json());
+app.use("/api/users", user_routes_1.default);
+app.use("/api/categories", category_routes_1.default);
+app.use("/api/brands", brand_routes_1.default);
+app.use("/api/products", product_routes_1.default);
+app.use("/api/varients", varient_routes_1.default);
+app.use("/api/inventories", inventory_routes_1.default);
+app.use("/api/product-images", imageUploads_route_1.default);
+app.use("/api/cart", cart_routes_1.default);
+app.use("/api/wishList", whishList_routes_1.default);
+app.use("/api/address", address_routes_1.default);
+app.use("/api/orders", order_routes_1.default);
+app.use("/api/payment", payment_route_1.default);
+app.use(not_found_middleware_1.default);
+app.use(error_middleware_1.default);
+exports.default = app;
