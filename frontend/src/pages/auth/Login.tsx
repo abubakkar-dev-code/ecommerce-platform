@@ -1,12 +1,13 @@
 import { useState } from "react";
 import authService from "../../services/auth.service";
 import { setCredentials } from "../../redux/slices/auth.slice";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import GoogleButton from "../../components/GoogleButton";
 import { useAppDispatch } from "../../redux/hooks";
 import toast from "react-hot-toast";
 
 const Login = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,7 @@ const Login = () => {
       if (response) {
         toast.success("Login successfull");
         console.log("resposne", response);
+        navigate("/");
 
         localStorage.setItem("token", response.data.token);
         dispatch(
