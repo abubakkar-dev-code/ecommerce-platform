@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import addressService from "../../services/address.service";
 import toast from "react-hot-toast";
+import orderService from "../../services/order.service";
+import paymentService from "../../services/payment.service";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 const Checkout = () => {
   const [loading, setLoading] = useState(false);
@@ -22,6 +29,7 @@ const Checkout = () => {
     const fetchAddress = async () => {
       try {
         const response = await addressService.getAddress();
+
         if (response.data) {
           setFormData({
             fullName: response.data.fullName || "",
@@ -35,14 +43,45 @@ const Checkout = () => {
           });
         }
       } catch (err: any) {
-        console.log(err?.response?.data?.message || err.message);
+        console.log(
+          err?.response?.data?.message || err?.message
+        );
       }
     };
 
     fetchAddress();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (
+      document.getElementById(
+        "razorpay-checkout-script"
+      )
+    ) {
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.id = "razorpay-checkout-script";
+    script.src =
+      "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+
+    script.onload = () => {
+      console.log("Razorpay Checkout loaded");
+    };
+
+    script.onerror = () => {
+      setError("Failed to load Razorpay");
+    };
+
+    document.body.appendChild(script);
+  }, []);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const { name, value } = e.target;
 
     setFormData((prev) => ({
@@ -51,88 +90,180 @@ const Checkout = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
 
     try {
       setLoading(true);
       setError("");
 
-      const response = await addressService.createOrUpdateAddress(formData);
-      console.log(response.data);
-      toast.success("Address saved successfully");
+      const addressResponse =
+        await addressService.createOrUpdateAddress(
+          formData
+        );
+
+      const addressId = addressResponse.data._id;
+
+      if (!addressId) {
+        throw new Error("Address ID was not returned");
+      }
+
+      const orderResponse =
+        await orderService.createOrder(addressId);
+
+      const orderId = orderResponse.data._id;
+
+      if (!orderId) {
+        throw new Error("Order ID was not returned");
+      }
+
+      const paymentResponse =
+        await paymentService.createPayment(orderId);
+
+      const paymentData = paymentResponse.data;
+
+      if (!paymentData?.razorpayOrderId) {
+        throw new Error(
+          "Razorpay order ID was not returned"
+        );
+      }
+
+      if (!paymentData?.razorpayKeyId) {
+        throw new Error(
+          "Razorpay key ID was not returned"
+        );
+      }
+
+      if (!window.Razorpay) {
+        throw new Error(
+          "Razorpay is not loaded yet"
+        );
+      }
+
+      const options = {
+        key: paymentData.razorpayKeyId,
+        amount: paymentData.amount,
+        currency: paymentData.currency,
+        name: "E-Commerce Platform",
+        description: "Order Payment",
+        order_id: paymentData.razorpayOrderId,
+
+        handler: async (response: any) => {
+          try {
+            const verifyResponse =
+              await paymentService.verifyPayment({
+                razorpay_order_id:
+                  response.razorpay_order_id,
+                razorpay_payment_id:
+                  response.razorpay_payment_id,
+                razorpay_signature:
+                  response.razorpay_signature,
+              });
+
+            console.log(
+              "Payment verification response:",
+              verifyResponse
+            );
+
+            toast.success(
+              "Payment verified successfully"
+            );
+          } catch (err: any) {
+            console.error(
+              "Payment verification failed:",
+              err
+            );
+
+            toast.error(
+              err?.response?.data?.message ||
+                "Payment verification failed"
+            );
+          }
+        },
+
+        modal: {
+          ondismiss: () => {
+            toast.error("Payment cancelled");
+          },
+        },
+      };
+
+      const razorpay =
+        new window.Razorpay(options);
+
+      razorpay.open();
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to save address");
+      console.error("Checkout error:", err);
+
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to create order";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text">Checkout</h1>
+    <div className="min-h-screen bg-background py-10">
+      <div className="mx-auto w-[90%] max-w-6xl">
+        <h1 className="mb-8 text-3xl font-bold text-text">
+          Checkout
+        </h1>
 
-        <p className="mt-2 text-muted">
-          Complete your order by providing your shipping details.
-        </p>
-      </div>
+        {error && (
+          <div className="mb-6 rounded-lg border border-error bg-red-50 p-4 text-error">
+            {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-error border border-red-200">
-          {error}
-        </div>
-      )}
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <div className="rounded-xl bg-surface p-6 shadow-sm">
+              <h2 className="mb-6 text-xl font-semibold text-text">
+                Shipping Address
+              </h2>
 
-      {/* Checkout Layout */}
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left Section */}
-        <section className="space-y-8 lg:col-span-2">
-          {/* Shipping Address */}
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <h2 className="text-lg font-semibold text-text">
-              Shipping Address
-            </h2>
-
-            <p className="mt-1 text-sm text-muted">
-              Enter the address where you want your order delivered.
-            </p>
-            <form onSubmit={handleSubmit} id="address-form">
-              <div className="mt-6 grid gap-5 sm:grid-cols-2">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-5"
+              >
                 <div>
                   <label className="mb-2 block text-sm font-medium text-text">
                     Full Name
                   </label>
 
                   <input
-                    name="fullName"
                     type="text"
+                    name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
-                    placeholder="Enter your full name"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
+                    required
+                    className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
                   />
                 </div>
 
-                {/* Phone */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-text">
-                    Phone Number
+                    Phone
                   </label>
 
                   <input
-                    name="phone"
                     type="tel"
+                    name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    placeholder="Enter your phone number"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
+                    required
+                    className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
                   />
                 </div>
 
-                {/* Address Line 1 */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-text">
                     Address Line 1
                   </label>
@@ -142,206 +273,162 @@ const Checkout = () => {
                     name="addressLine1"
                     value={formData.addressLine1}
                     onChange={handleChange}
-                    placeholder="House number, street name"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
+                    required
+                    className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
                   />
                 </div>
 
-                {/* Address Line 2 */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-text">
                     Address Line 2
                   </label>
 
                   <input
+                    type="text"
                     name="addressLine2"
                     value={formData.addressLine2}
                     onChange={handleChange}
-                    type="text"
-                    placeholder="Apartment, landmark, etc. (optional)"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
+                    className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
                   />
                 </div>
 
-                {/* City */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-text">
-                    City
-                  </label>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">
+                      City
+                    </label>
 
-                  <input
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    type="text"
-                    placeholder="Enter your city"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
-                  />
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">
+                      State
+                    </label>
+
+                    <input
+                      type="text"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
+                    />
+                  </div>
                 </div>
 
-                {/* State */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-text">
-                    State
-                  </label>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">
+                      Pincode
+                    </label>
 
-                  <input
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    type="text"
-                    placeholder="Enter your state"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
-                  />
+                    <input
+                      type="text"
+                      name="pincode"
+                      value={formData.pincode}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">
+                      Country
+                    </label>
+
+                    <input
+                      type="text"
+                      name="country"
+                      value={formData.country}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
+                    />
+                  </div>
                 </div>
 
-                {/* Pincode */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-text">
-                    Pincode
-                  </label>
-
-                  <input
-                    name="pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    type="text"
-                    placeholder="Enter your pincode"
-                    className="w-full rounded-md border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-primary"
-                  />
-                </div>
-
-                {/* Country */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-text">
-                    Country
-                  </label>
-
-                  <input
-                    name="country"
-                    value={formData.country}
-                    onChange={handleChange}
-                    type="text"
-                    readOnly
-                    className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm text-muted outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover disabled:opacity-50"
+                  className="w-full rounded-lg bg-primary px-6 py-3 font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Saving Address..." : "Save Address"}
+                  {loading
+                    ? "Processing..."
+                    : "Proceed to Payment"}
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
 
-          {/* Order Review */}
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <h2 className="text-lg font-semibold text-text">Order Review</h2>
+          <div>
+            <div className="rounded-xl bg-surface p-6 shadow-sm">
+              <h2 className="mb-6 text-xl font-semibold text-text">
+                Order Summary
+              </h2>
 
-            <p className="mt-1 text-sm text-muted">
-              Review your products before placing the order.
-            </p>
-
-            <div className="mt-6 flex flex-col gap-5 border-t border-border pt-6 sm:flex-row">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg bg-background p-3">
-                <img
-                  src="https://placehold.co/200x200?text=iPhone+15"
-                  alt="iPhone 15"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-
-              <div className="flex flex-1 flex-col justify-between">
+              <div className="flex items-center justify-between border-b border-border pb-4">
                 <div>
-                  <h3 className="font-semibold text-text">iPhone 15</h3>
-
-                  <p className="mt-1 text-sm text-muted">Storage: 128GB</p>
-
-                  <p className="mt-2 text-sm text-muted">Quantity: 1</p>
-                </div>
-
-                <div className="mt-3 sm:mt-0">
-                  <span className="font-semibold text-text">₹79,900</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Right Section */}
-        <aside className="h-fit rounded-xl border border-border bg-surface p-6">
-          <h2 className="text-lg font-semibold text-text">Order Summary</h2>
-
-          <div className="mt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Subtotal</span>
-
-              <span className="font-medium text-text">₹79,900</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Shipping</span>
-
-              <span className="font-medium text-success">Free</span>
-            </div>
-
-            <div className="border-t border-border pt-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-text">Total</span>
-
-                <span className="text-xl font-bold text-text">₹79,900</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div className="mt-8 border-t border-border pt-6">
-            <h3 className="text-sm font-semibold text-text">Payment Method</h3>
-
-            <div className="mt-3 rounded-lg border-2 border-primary bg-background p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="radio"
-                  name="payment"
-                  value="razorpay"
-                  defaultChecked
-                  className="mt-1 accent-primary"
-                />
-
-                <div>
-                  <p className="text-sm font-medium text-text">
-                    Online Payment
+                  <p className="font-medium text-text">
+                    iPhone 15
                   </p>
 
-                  <p className="mt-1 text-xs text-muted">
-                    UPI, Cards, Net Banking & Wallets
+                  <p className="text-sm text-muted">
+                    Quantity: 1
                   </p>
+                </div>
+
+                <p className="font-semibold text-text">
+                  ₹79,900
+                </p>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">
+                    Subtotal
+                  </span>
+
+                  <span className="text-text">
+                    ₹79,900
+                  </span>
+                </div>
+
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted">
+                    Shipping
+                  </span>
+
+                  <span className="text-success">
+                    Free
+                  </span>
+                </div>
+
+                <div className="flex justify-between border-t border-border pt-4 text-lg font-bold">
+                  <span className="text-text">
+                    Total
+                  </span>
+
+                  <span className="text-text">
+                    ₹79,900
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Place Order */}
-          <Link
-            to="/orders"
-            className="mt-6 block w-full text-center rounded-md bg-primary px-6 py-3 font-medium text-white transition hover:bg-primary-hover"
-          >
-            Place Order & Pay
-          </Link>
-
-          <p className="mt-3 text-center text-xs text-muted">
-            Your payment will be securely processed.
-          </p>
-        </aside>
+        </div>
       </div>
-    </main>
+    </div>
   );
 };
 
 export default Checkout;
+
