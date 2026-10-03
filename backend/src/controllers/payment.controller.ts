@@ -57,7 +57,7 @@ export const createPayment = async (
         razorpayOrderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
-        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+        razorpayKeyId: process.env.RAZOR_PAY_KEY,
       }),
     );
   } catch (error) {
@@ -97,7 +97,7 @@ export const verifyPayment = async (
       throw new ApiError(404, "Order not found");
     }
     const generatedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac("sha256", process.env.RAZOR_PAY_SECRET!)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
     if (generatedSignature !== razorpay_signature) {
