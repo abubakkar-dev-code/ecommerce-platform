@@ -148,7 +148,7 @@ export const getSingleOrder = async (
     if (!order) {
       throw new ApiError(404, "order not found");
     }
-    res.status(200).json(new ApiResponse("order fetched successfully", order));
+    res.status(200).json(new ApiResponse("single order fetched successfully", order));
   } catch (error) {
     next(error);
   }

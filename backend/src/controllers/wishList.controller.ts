@@ -55,15 +55,15 @@ export const getwishList = async (
     if (!userId) {
       throw new ApiError(400, "Unauthorized,please Login first");
     }
-    const userWishListt = await WishList.findOne({ user: userId }).populate(
-      "products",
-    );
-    if (!userWishListt) {
+    const userWishList = await WishList.findOne({ user: userId })
+      .populate("products")
+      .populate("variants");
+    if (!userWishList) {
       throw new ApiError(400, "WishList is Empty");
     }
     res
       .status(200)
-      .json(new ApiResponse("WishList fetched successfully", userWishListt));
+      .json(new ApiResponse("WishList fetched successfully", userWishList));
   } catch (error) {
     next(error);
   }

@@ -13,6 +13,13 @@ const wishlistSchema = new Schema({
       default: [],
     },
   ],
+  variants: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Varient",
+      default: [],
+    },
+  ],
 });
 const WishList = mongoose.model("WishList", wishlistSchema);
 export default WishList;

@@ -100,7 +100,7 @@ export const getProducts = async (
   }
 };
 
-export const seachProducts = async (
+export const searchProducts = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -298,70 +298,121 @@ export const filterProducts = async (
       page?: string;
       limit?: string;
     };
+
     const min = minPrice ? Number(minPrice) : undefined;
     const max = maxPrice ? Number(maxPrice) : undefined;
-
     const filter: any = {
       isActive: true,
     };
+
     if (brand) {
       filter.brand = brand;
     }
+
     if (category) {
       filter.category = category;
     }
-    const varientFilter: any = {
+    const variantFilter: any = {
       isActive: true,
     };
+
     if (min !== undefined || max !== undefined) {
-      varientFilter.price = {};
+      variantFilter.price = {};
     }
+
     if (min !== undefined) {
-      varientFilter.price.$gte = min;
+      variantFilter.price.$gte = min;
     }
+
     if (max !== undefined) {
-      varientFilter.price.$lte = max;
+      variantFilter.price.$lte = max;
     }
-    const matchedVarients = await Varient.find(varientFilter);
-    const productids = matchedVarients.map((varient) => varient.product);
-    if (productids.length === 0) {
-      throw new ApiError(404, "No products found");
+
+    const matchedVariants = await Varient.find(variantFilter).select("product");
+
+    const productIds = matchedVariants.map((variant) => variant.product);
+
+    if (min !== undefined || max !== undefined) {
+      if (productIds.length === 0) {
+        return res.status(200).json(
+          new ApiResponse("Products filtered successfully", [], {
+            currentPage: Number(page),
+            totalPages: 0,
+            itemsPerPage: Number(limit),
+            totalProducts: 0,
+          }),
+        );
+      }
+
+      filter._id = {
+        $in: productIds,
+      };
     }
-    filter._id = { $in: productids };
     const sortOption: any = {};
+
     if (sort === "name-asc") {
       sortOption.name = 1;
     }
+
     if (sort === "name-dsc") {
       sortOption.name = -1;
     }
+
     if (sort === "newest") {
       sortOption.createdAt = -1;
     }
+
     if (sort === "oldest") {
       sortOption.createdAt = 1;
     }
-    const currentPage = Number(page);
-    const itemsPerPage = Number(limit);
+
+    const currentPage = Math.max(Number(page), 1);
+    const itemsPerPage = Math.max(Number(limit), 1);
+
     const skip = (currentPage - 1) * itemsPerPage;
+
     const totalProducts = await Product.countDocuments(filter);
+
     const totalPages = Math.ceil(totalProducts / itemsPerPage);
-    const filteredProducts = await Product.find(filter)
+
+    const products = await Product.find(filter)
       .sort(sortOption)
       .skip(skip)
       .limit(itemsPerPage);
+
+    const productsWithDetails = await Promise.all(
+      products.map(async (product) => {
+        const variants = await Varient.find({
+          product: product._id,
+          isActive: true,
+        });
+
+        const images = await ProductImage.find({
+          product: product._id,
+          isActive: true,
+        }).sort({ sortOrder: 1 });
+
+        return {
+          ...product.toObject(),
+          variants,
+          images,
+        };
+      }),
+    );
+
     const pagination = {
       currentPage,
       totalPages,
       itemsPerPage,
       totalProducts,
     };
+
     res
       .status(200)
       .json(
         new ApiResponse(
           "Products filtered successfully",
-          filteredProducts,
+          productsWithDetails,
           pagination,
         ),
       );
