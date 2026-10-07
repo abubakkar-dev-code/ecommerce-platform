@@ -1,117 +1,124 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import authService from "../../services/auth.service";
-import GoogleButton from "../../components/GoogleButton";
+import authService from "../../services/authService";
 import toast from "react-hot-toast";
+import { Link } from "react-router-dom";
 
 const Register = () => {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
   });
-  const hadnleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [errors, setErrors] = useState("");
+  const [loading, setLoading] = useState(false);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+    setErrors("");
   };
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     try {
       const response = await authService.register(formData);
       if (response) {
-        toast.success("Account created successfully");
-        navigate("/login");
+        toast.success("Registered successfully");
+        console.log(response);
       }
-    } catch (error:any) {
-      console.log(error.message);
-      setError(error.message);
+    } catch (error) {
+      toast.error("Registration failed");
+      setErrors(error?.response?.data?.message);
     } finally {
       setLoading(false);
     }
   };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-text text-center">
-          Create Account
-        </h1>
-
-        <p className="mt-2 text-center text-muted">
-          Create your account to get started
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text">
-              Name
-            </label>
-
-            <input
-              name="name"
-              value={formData.name}
-              type="text"
-              placeholder="Enter your name"
-              onChange={hadnleFormChange}
-              className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text">
-              Email
-            </label>
-
-            <input
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={hadnleFormChange}
-              placeholder="Enter your email"
-              className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text">
-              Password
-            </label>
-
-            <input
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={hadnleFormChange}
-              placeholder="Enter your password"
-              className="w-full rounded-lg border border-border px-4 py-3 outline-none focus:border-primary"
-            />
-          </div>
-          {error && <p className="text-sm text-error">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-primary py-3 font-medium text-white hover:bg-primary-hover"
-          >
-            {loading ? "Creating Account..." : "Create Account"}
-          </button>
-          <GoogleButton />
-        </form>
-
-        <p className="mt-6 text-center text-sm text-muted">
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            className="cursor-pointer font-medium text-primary hover:underline"
-          >
-            Login
-          </Link>
-        </p>
+    <div className="flex justify-center items-center h-screen">
+      <div className="bg-background shadow-lg px-10 py-10  rounded-xl w-[30%]">
+        <div className="text-center mb-3">
+          <h1 className="text-2xl font-bold">Create new Account</h1>
+          <p className="text-muted font-bold mt-2 text-medium">
+            Create your account to get started
+          </p>
+        </div>
+        <div className="mt-10">
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col">
+              <label className="mb-2 font-bold text-sm">Nmae</label>
+              <input
+                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div className="flex flex-col mt-5">
+              <label className="mb-2 font-bold text-sm">Email</label>
+              <input
+                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email address"
+              />
+            </div>
+            <div className="flex flex-col mt-5">
+              <label className="mb-2 font-bold text-sm">Password</label>
+              <input
+                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+              />
+            </div>
+            <p className="text-red-600 text-semibold text-sm mt-4">{errors}</p>
+            <div className="mt-5 flex flex-col gap-5">
+              <button
+                type="submit"
+                className="bg-primary py-2 rounded-lg text-white font-bold"
+              >
+                {loading ? (
+                  <>
+                    {" "}
+                    <span className="inline-block mr-2 h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                    Registering
+                  </>
+                ) : (
+                  "Register"
+                )}
+              </button>
+              <button
+                type="button"
+                className="border border-gray-400 py-2 rounded-lg font-bold"
+                onClick={(e) =>
+                  toast.custom(
+                    <div className="border-2 border-yellow-500 bg-yellow-100 text-yellow-700 p-4 rounded">
+                      The Future is coming soon
+                    </div>,
+                  )
+                }
+              >
+                Continue with Google
+              </button>
+            </div>
+            <div className="mt-5 text-center">
+              <p className="mb-2 text-muted font-bold text-sm">
+                Already have an account?
+                <span className="text-primary font-bold text-sm ml-2">
+                  <Link to="/auth/login"> Login</Link>
+                </span>
+              </p>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

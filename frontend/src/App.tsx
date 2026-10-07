@@ -1,10 +1,10 @@
-import AuthInitializer from "./components/common/AuthInitializer";
 import AppRoutes from "./routes/AppRoutes";
+import { Toaster } from "react-hot-toast";
 
 const App = () => {
   return (
     <div>
-      <AuthInitializer />
+      <Toaster toastOptions={{ duration: 2000 }} />
       <AppRoutes />
     </div>
   );
