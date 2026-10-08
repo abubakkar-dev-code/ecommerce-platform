@@ -135,7 +135,7 @@ const OrderSummary = ({
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
                 placeholder="Promo code (e.g. SAVE10)"
-                className="w-full text-sm uppercase px-3.5 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:normal-case placeholder:text-gray-400"
+                className="w-full text-sm uppercase px-3.5 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-gray-400"
               />
               <button
                 type="submit"

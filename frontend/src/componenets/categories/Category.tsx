@@ -23,7 +23,7 @@ const Category = () => {
               key={category}
               type="button"
               onClick={() => setSelectedCategory(category)}
-              className={`flex flex-col items-center justify-center p-4 sm:py-6 sm:px-3 rounded-2xl border bg-white transition-all duration-200 cursor-pointer min-h-[130px] hover:shadow-sm ${
+              className={`flex flex-col items-center justify-center p-4 sm:py-6 sm:px-3 rounded-2xl border bg-white transition-all duration-200 cursor-pointer min-h-32.5 hover:shadow-sm ${
                 isSelected
                   ? "border-blue-500 ring-1 ring-blue-500/20"
                   : "border-gray-200 hover:border-blue-400"

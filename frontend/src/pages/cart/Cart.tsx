@@ -1,6 +1,4 @@
 import { Link } from "react-router-dom";
-import Button from "../../componenets/UI/Button";
-
 const Cart = () => {
   const cartItems = [
     {
