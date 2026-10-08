@@ -91,7 +91,7 @@ const Login = () => {
               <button
                 type="button"
                 className="border border-gray-400 py-2 rounded-lg font-bold"
-                onClick={(e) =>
+                onClick={() =>
                   toast.custom(
                     <div className="border-2 border-yellow-500 bg-yellow-100 text-yellow-700 p-4 rounded">
                       The Future is coming soon
