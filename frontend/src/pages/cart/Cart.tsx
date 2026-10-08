@@ -117,9 +117,11 @@ const Cart = () => {
                 ))}
                 <p className="w-full bg-gray-300"></p>
                 <div className="mt-2">
-                  <button className="bg-primary text-white px-4 py-2 rounded-lg w-full font-semibold">
-                    proceed to checkout
-                  </button>
+                  <Link to="/checkout">
+                    <button className="bg-primary text-white px-4 py-2 rounded-lg w-full font-semibold">
+                      proceed to checkout
+                    </button>
+                  </Link>
                   <div className="text-center mt-3">
                     <Link
                       to="/products"

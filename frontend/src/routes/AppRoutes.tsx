@@ -6,6 +6,8 @@ import MainLayout from "../layouts/MainLayout";
 import Home from "../pages/home/Home";
 import Products from "../pages/products/Products";
 import Cart from "../pages/cart/Cart";
+import Checkout from "../pages/checkout/Checkout";
+import Wishlist from "../pages/wishList/wishList";
 
 const AppRoutes = () => {
   return (
@@ -18,6 +20,8 @@ const AppRoutes = () => {
         <Route index element={<Home />} />
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/wishList" element={<Wishlist />} />
       </Route>
     </Routes>
   );
