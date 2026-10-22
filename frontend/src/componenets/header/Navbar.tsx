@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Button from "../UI/Button";
 import { useState } from "react";
 import { CgProfile } from "react-icons/cg";
@@ -7,7 +7,7 @@ const Navbar = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   console.log(isProfileOpen);
-
+  const navigate = useNavigate();
   return (
     <div>
       <nav className="flex w-full justify-between py-5 px-10 border-b border-gray-300 items-center">
@@ -57,21 +57,38 @@ const Navbar = () => {
             {isProfileOpen && (
               <div className="absolute right-2 bg-white top-22 border border-gray-500 w-32 flex flex-col rounded-lg mt-2">
                 <Link to="/profile">
-                  <button className="font-bold block hover:bg-gray-100 text-center py-2 w-full">Profile</button>
+                  <button
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className="font-bold block hover:bg-gray-100 text-center py-2 w-full"
+                  >
+                    Profile
+                  </button>
                 </Link>
                 <Link to="/orders">
-                  <button className="font-bold block hover:bg-gray-100 text-center py-2 w-full">Orders</button>
+                  <button
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className="font-bold block hover:bg-gray-100 text-center py-2 w-full"
+                  >
+                    Orders
+                  </button>
                 </Link>
                 <Link to="/">
-                  <button onClick={() => setIsLogin(!isLogin)} className="font-bold block hover:bg-gray-100 text-center py-2 w-full text-red-500">Login</button>
+                  <button
+                    onClick={() => setIsLogin(!isLogin)}
+                    className="font-bold block hover:bg-gray-100 text-center py-2 w-full text-red-500"
+                  >
+                    Log out
+                  </button>
                 </Link>
               </div>
             )}
           </div>
         ) : (
           <div className="flex gap-2">
-            <button className="font-bold">Login</button>
-            <Button>Register</Button>
+            <button className="font-bold" onClick={() => navigate("/auth/login")}>
+              Login
+            </button>
+            <Button onClick={() => navigate("/auth/register")}>Register</Button>
           </div>
         )}
       </nav>

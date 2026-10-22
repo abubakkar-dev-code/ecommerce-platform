@@ -1,9 +1,10 @@
 import { useState } from "react";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const navigate=useNavigate()
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState("");
   const [formData, setFormData] = useState({
@@ -28,6 +29,7 @@ const Login = () => {
       if (response) {
         toast.success("Login successfull");
         console.log(response);
+        navigate("/")
       }
     } catch (error) {
       toast.error("login failed");

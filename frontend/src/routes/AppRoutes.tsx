@@ -8,6 +8,8 @@ import Products from "../pages/products/Products";
 import Cart from "../pages/cart/Cart";
 import Checkout from "../pages/checkout/Checkout";
 import Wishlist from "../pages/wishList/wishList";
+import { Orders } from "../pages/orders/Orders";
+import OrderDetails from "../pages/orders/OrderDetails";
 
 const AppRoutes = () => {
   return (
@@ -22,6 +24,8 @@ const AppRoutes = () => {
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/wishList" element={<Wishlist />} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/order-details/:orderId" element={<OrderDetails />} />
       </Route>
     </Routes>
   );
