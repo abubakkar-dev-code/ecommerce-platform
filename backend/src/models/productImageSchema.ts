@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IProductImage extends Document {
+  publicId: string;
   product: mongoose.Types.ObjectId;
   image: string;
   isPrimary: boolean;
@@ -10,6 +11,10 @@ export interface IProductImage extends Document {
 
 const productImageSchema = new Schema<IProductImage>(
   {
+    publicId: {
+      type: String,
+      required: true,
+    },
     product: {
       type: Schema.Types.ObjectId,
       ref: "Product",

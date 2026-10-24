@@ -5,7 +5,7 @@ import {
   getProductImages,
   updateImageById,
 } from "../controllers/image.controller";
-import upload from "../middleware/upload";
+import upload from "../middleware/upload.middleware";
 
 const router = express.Router();
 

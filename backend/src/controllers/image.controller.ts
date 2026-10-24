@@ -1,9 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import ApiResponse from "../utils/api-response";
 import ApiError from "../utils/api-error";
-import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { env } from "../config/env";
-import s3Client from "../config/s3.config";
+import cloudinary from "../config/cloudinary";
 import Product from "../models/product.model";
 import ProductImage from "../models/productImageSchema";
 
@@ -14,69 +12,88 @@ export const createImage = async (
 ) => {
   try {
     const { productId } = req.params;
+
     const product = await Product.findById(productId);
+
     if (!product) {
-      throw new ApiError(404, "product not found");
+      throw new ApiError(404, "Product not found");
     }
+
     if (!req.file) {
-      throw new ApiError(400, "Please upload  the image");
+      throw new ApiError(400, "Please upload an image");
     }
-    const imageKey = `products/${Date.now()}-${req.file.originalname}`;
-    const command = new PutObjectCommand({
-      Bucket: env.AWS_S3_BUCKET_NAME,
-      Key: imageKey,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-    });
-    await s3Client.send(command);
+
     const productImage = await ProductImage.create({
       product: productId,
-      image: imageKey,
+      image: req.file.path,
+      publicId: req.file.filename,
     });
+
     res
-      .status(200)
-      .json(new ApiResponse("Image uploaded successfully", productImage));
+      .status(201)
+      .json(
+        new ApiResponse(
+          "Image uploaded successfully",
+          productImage,
+        ),
+      );
   } catch (error) {
     next(error);
   }
 };
+
 export const getProductImages = async (
-  req: Request,
+  req: Request<{ productId: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const { productId } = req.params;
+
     const product = await Product.findById(productId);
+
     if (!product) {
-      throw new ApiError(404, "product not found");
+      throw new ApiError(404, "Product not found");
     }
+
     const images = await ProductImage.find({
       product: productId,
       isActive: true,
     }).sort({ sortOrder: 1 });
+
     if (images.length === 0) {
-      throw new ApiError(404, "no image found");
+      throw new ApiError(404, "No images found");
     }
+
     res
       .status(200)
-      .json(new ApiResponse("Images fetched successfully", images));
+      .json(
+        new ApiResponse(
+          "Images fetched successfully",
+          images,
+        ),
+      );
   } catch (error) {
     next(error);
   }
 };
+
 export const updateImageById = async (
-  req: Request,
+  req: Request<{ imageId: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const { imageId } = req.params;
     const { isPrimary, sortOrder, isActive } = req.body;
+    console.log(req.file)
+
     const productImage = await ProductImage.findById(imageId);
+
     if (!productImage) {
       throw new ApiError(404, "Image not found");
     }
+
     if (isPrimary !== undefined) {
       productImage.isPrimary = isPrimary;
     }
@@ -88,52 +105,101 @@ export const updateImageById = async (
     if (isActive !== undefined) {
       productImage.isActive = isActive;
     }
-    if (req.file) {
-      const oldKey = productImage.image;
-      const newKey = `products/${Date.now()}-${req.file.originalname}`;
-      const commmand = new PutObjectCommand({
-        Bucket: env.AWS_S3_BUCKET_NAME,
-        Key: newKey,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-      });
-      await s3Client.send(commmand);
-      productImage.image = newKey;
 
-      const deleteCommand = new DeleteObjectCommand({
-        Bucket: env.AWS_S3_BUCKET_NAME,
-        Key: oldKey,
-      });
-      await s3Client.send(deleteCommand);
+    if (req.file) {
+      const oldPublicId = productImage.publicId;
+
+      productImage.image = req.file.path;
+      productImage.publicId = req.file.filename;
+
+      await productImage.save();
+
+      if (oldPublicId) {
+        try {
+          const result = await cloudinary.uploader.destroy(
+            oldPublicId,
+            { resource_type: "image" },
+          );
+
+          if (result.result !== "ok" && result.result !== "not found") {
+            console.error(
+              "Could not delete the previous Cloudinary image:",
+              result,
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Failed to delete the previous Cloudinary image:",
+            error,
+          );
+        }
+      }
+
+      res
+        .status(200)
+        .json(
+          new ApiResponse(
+            "Image updated successfully",
+            productImage,
+          ),
+        );
+
+      return;
     }
+
     await productImage.save();
+
     res
       .status(200)
-      .json(new ApiResponse("Image updated successfully", productImage));
+      .json(
+        new ApiResponse(
+          "Image updated successfully",
+          productImage,
+        ),
+      );
   } catch (error) {
     next(error);
   }
 };
+
 export const deleteImageById = async (
-  req: Request,
+  req: Request<{ imageId: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const { imageId } = req.params;
+
     const productImage = await ProductImage.findById(imageId);
+
     if (!productImage) {
-      throw new ApiError(404, "product Image not found");
+      throw new ApiError(404, "Product image not found");
     }
-    const deleteCommand = new DeleteObjectCommand({
-      Bucket: env.AWS_S3_BUCKET_NAME,
-      Key: productImage.image,
-    });
-    await s3Client.send(deleteCommand);
+
+    if (productImage.publicId) {
+      const result = await cloudinary.uploader.destroy(
+        productImage.publicId,
+        { resource_type: "image" },
+      );
+
+      if (result.result !== "ok" && result.result !== "not found") {
+        throw new ApiError(
+          502,
+          "Could not delete the image from Cloudinary",
+        );
+      }
+    }
+
     await ProductImage.findByIdAndDelete(imageId);
+
     res
       .status(200)
-      .json(new ApiResponse("Product image deleted successfully", null));
+      .json(
+        new ApiResponse(
+          "Product image deleted successfully",
+          null,
+        ),
+      );
   } catch (error) {
     next(error);
   }
