@@ -6,18 +6,27 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary as any,
   params: {
     folder: "nexora/products",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
-    resource_type: "image",
+    resource_type: "auto",
   },
 });
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, callback) => {
-  const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+  ];
 
   if (allowedMimeTypes.includes(file.mimetype)) {
     callback(null, true);
   } else {
-    callback(new Error("Only JPEG, PNG, and WebP images are allowed."));
+    callback(
+      new Error(
+        "Only JPG, PNG, WEBP, PDF, and DOC files are allowed.",
+      ),
+    );
   }
 };
 

@@ -1,53 +1,51 @@
-import mongoose, { Schema, Document } from "mongoose";
-
-export interface IProductImage extends Document {
+import mongoose, { Schema } from "mongoose";
+interface Thumbnail {
+  url: string;
   publicId: string;
+}
+export interface IproductImage extends Document {
   product: mongoose.Types.ObjectId;
-  image: string;
-  isPrimary: boolean;
-  sortOrder: number;
+  primaryImage: string;
+  primaryPublicId: string;
+  thumbnails?: Thumbnail[];
   isActive: boolean;
 }
-
-const productImageSchema = new Schema<IProductImage>(
+const productImageSchema = new mongoose.Schema<IproductImage>(
   {
-    publicId: {
-      type: String,
-      required: true,
-    },
     product: {
       type: Schema.Types.ObjectId,
-      ref: "Product",
+      ref: "Products",
       required: true,
     },
-
-    image: {
+    primaryImage: {
       type: String,
-      required: true,
+     
     },
-
-    isPrimary: {
-      type: Boolean,
-      default: false,
+    primaryPublicId: {
+      type: String,
     },
-
-    sortOrder: {
-      type: Number,
-      default: 0,
-    },
-
+    thumbnails: [
+      {
+        url: {
+          type: String,
+          required: true,
+        },
+        publicId: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,
     },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
-const ProductImage = mongoose.model<IProductImage>(
-  "ProductImage",
+const ProductImage = mongoose.model<IproductImage>(
+  "productImage",
   productImageSchema,
 );
 

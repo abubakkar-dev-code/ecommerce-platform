@@ -76,7 +76,6 @@ export const getProducts = async (
           product: product._id,
           isActive: true,
         });
-
         const images = await ProductImage.find({
           product: product._id,
           isActive: true,
@@ -85,8 +84,8 @@ export const getProducts = async (
         return {
           ...product.toObject(),
           variants,
-          images,
-        };
+          images
+        }
       }),
     );
 
