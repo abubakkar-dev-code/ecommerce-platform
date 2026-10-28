@@ -2,8 +2,36 @@ import { Link } from "react-router-dom";
 import Category from "../../componenets/categories/Category";
 import Hero from "../../componenets/hero/Hero";
 import ProductCard from "../../componenets/products/ProductCard";
+import { useEffect, useState } from "react";
+import productService from "../../services/productService";
+import { useDispatch, useSelector } from "react-redux";
+import { setproducts } from "../../redux/slices/productSlice";
+import type { RootState } from "../../redux/store";
 
 const Home = () => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const dispatch = useDispatch();
+  useEffect(() => {
+    const fetchproducts = async () => {
+      setLoading(true);
+      try {
+        const res = await productService.getProducts();
+        setProducts(res.data);
+        dispatch(setproducts(res.data));
+      } catch (error) {
+        setError(error?.response?.data?.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchproducts();
+  }, []);
+  const productsData = useSelector(
+    (state: RootState) => state.productInfo.products,
+  );
+  console.log(productsData)
   const featuredProducts = [
     {
       id: 1,
@@ -50,7 +78,9 @@ const Home = () => {
 
       <section>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Featured Products
+          </h2>
           <Link
             to="/products"
             className="text-primary font-semibold text-sm hover:text-blue-700 flex items-center gap-1 group"
@@ -63,7 +93,7 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
+          {productsData.slice(0,4).map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
@@ -73,4 +103,3 @@ const Home = () => {
 };
 
 export default Home;
-

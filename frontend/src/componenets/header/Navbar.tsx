@@ -51,7 +51,10 @@ const Navbar = () => {
                 Cart
               </button>
             </Link>
-            <button onClick={() => setIsProfileOpen(!isProfileOpen)}>
+            <button
+              className="transition-all duration-300 ease-in"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+            >
               <CgProfile size={35} />
             </button>
             {isProfileOpen && (
@@ -85,7 +88,10 @@ const Navbar = () => {
           </div>
         ) : (
           <div className="flex gap-2">
-            <button className="font-bold" onClick={() => navigate("/auth/login")}>
+            <button
+              className="font-bold"
+              onClick={() => navigate("/auth/login")}
+            >
               Login
             </button>
             <Button onClick={() => navigate("/auth/register")}>Register</Button>

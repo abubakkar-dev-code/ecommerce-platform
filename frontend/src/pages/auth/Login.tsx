@@ -2,9 +2,12 @@ import { useState } from "react";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setUsers } from "../../redux/slices/authSlice";
 
 const Login = () => {
-  const navigate=useNavigate()
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState("");
   const [formData, setFormData] = useState({
@@ -28,8 +31,8 @@ const Login = () => {
       const response = await authService.login(formData);
       if (response) {
         toast.success("Login successfull");
-        console.log(response);
-        navigate("/")
+        dispatch(setUsers(response.data));
+        navigate("/");
       }
     } catch (error) {
       toast.error("login failed");
@@ -38,7 +41,7 @@ const Login = () => {
       setLoading(false);
     }
   };
-  console.log(errors);
+  
 
   return (
     <div className="flex justify-center items-center h-screen">

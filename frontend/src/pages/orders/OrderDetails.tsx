@@ -4,11 +4,13 @@ import { IoLocationOutline, IoCallOutline } from "react-icons/io5";
 import { MdOutlineCreditCard } from "react-icons/md";
 import { useLocation } from "react-router-dom";
 import Button from "../../componenets/UI/Button";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../redux/store";
 
 const OrderDetails = () => {
+
   const location = useLocation();
   const { order } = location.state;
-  console.log(order);
 
   return (
     <div className="max-w-7xl mx-auto">

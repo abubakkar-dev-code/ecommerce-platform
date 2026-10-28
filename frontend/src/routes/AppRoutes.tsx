@@ -10,6 +10,8 @@ import Checkout from "../pages/checkout/Checkout";
 import Wishlist from "../pages/wishList/wishList";
 import { Orders } from "../pages/orders/Orders";
 import OrderDetails from "../pages/orders/OrderDetails";
+import Profile from "../pages/profile/Profile";
+import ProductDetails from "../pages/products/ProductDetails";
 
 const AppRoutes = () => {
   return (
@@ -21,11 +23,13 @@ const AppRoutes = () => {
       <Route path="/" element={<MainLayout />}>
         <Route index element={<Home />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/products/:productId" element={<ProductDetails />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/wishList" element={<Wishlist />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/order-details/:orderId" element={<OrderDetails />} />
+        <Route path="/profile" element={<Profile />} />
       </Route>
     </Routes>
   );

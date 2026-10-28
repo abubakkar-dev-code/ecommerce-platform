@@ -1,84 +1,106 @@
+import { useEffect, useState } from "react";
 import Pagination from "../../componenets/products/Pagination";
 import ProductCard from "../../componenets/products/ProductCard";
 
+import type { RootState } from "../../redux/store";
+import { useSelector } from "react-redux";
+import productService from "../../services/productService";
+import { Link } from "react-router-dom";
+
 const Products = () => {
-  const categories = [
-    { type: "checkbox", label: "Mobiles" },
-    { type: "checkbox", label: "Laptops" },
-    { type: "checkbox", label: "Headphones" },
-    { type: "checkbox", label: "Cameras" },
-    { type: "checkbox", label: "Smart Watches" },
-  ];
-  const brands = [
-    { type: "checkbox", label: "Apple" },
-    { type: "checkbox", label: "Samsung" },
-    { type: "checkbox", label: "Sony" },
-    { type: "checkbox", label: "Boat" },
-    { type: "checkbox", label: "Canon" },
-  ];
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {}, []);
+  const productsData = useSelector(
+    (state: RootState) => state.productInfo.products,
+  );
+  console.log(productsData);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [fetchCategories, fetchBrands] = await Promise.all([
+          productService.getCategories(),
+          productService.getBrands(),
+        ]);
+        setCategories(fetchCategories.data);
+        setBrands(fetchBrands.data);
+      } catch (error) {
+        setError(error?.response?.data?.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
   const filters = [
     "Newest",
     "Oldest",
     "Price:Low to High",
     "Price:High to Low",
   ];
-  const featuredProducts = [
-    {
-      id: 1,
-      name: "iPhone 15",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=iPhone+15",
-      rating: 4.5,
-      reviews: 120,
-      price: 79900,
-      originalPrice: 89000,
-    },
-    {
-      id: 2,
-      name: "Samsung Galaxy S24",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Galaxy+S24",
-      rating: 4.4,
-      reviews: 98,
-      price: 64999,
-      originalPrice: 74999,
-    },
-    {
-      id: 3,
-      name: "MacBook Air M2",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=MacBook+Air",
-      rating: 4.7,
-      reviews: 200,
-      price: 89900,
-      originalPrice: 99900,
-    },
-    {
-      id: 4,
-      name: "Sony Headphones",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Sony+Headphones",
-      rating: 4.6,
-      reviews: 150,
-      price: 7990,
-      originalPrice: 10990,
-    },
-    {
-      id: 5,
-      name: "Apple Watch Series 9",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Apple+Watch",
-      rating: 4.5,
-      reviews: 175,
-      price: 39900,
-      originalPrice: 45900,
-    },
-    {
-      id: 6,
-      name: "Canon EOS R50",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Canon+Camera",
-      rating: 4.6,
-      reviews: 110,
-      price: 58990,
-      originalPrice: 64990,
-    },
-  ];
+  // const featuredProducts = [
+  //   {
+  //     id: 1,
+  //     name: "iPhone 15",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=iPhone+15",
+  //     rating: 4.5,
+  //     reviews: 120,
+  //     price: 79900,
+  //     originalPrice: 89000,
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Samsung Galaxy S24",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Galaxy+S24",
+  //     rating: 4.4,
+  //     reviews: 98,
+  //     price: 64999,
+  //     originalPrice: 74999,
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "MacBook Air M2",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=MacBook+Air",
+  //     rating: 4.7,
+  //     reviews: 200,
+  //     price: 89900,
+  //     originalPrice: 99900,
+  //   },
+  //   {
+  //     id: 4,
+  //     name: "Sony Headphones",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Sony+Headphones",
+  //     rating: 4.6,
+  //     reviews: 150,
+  //     price: 7990,
+  //     originalPrice: 10990,
+  //   },
+  //   {
+  //     id: 5,
+  //     name: "Apple Watch Series 9",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Apple+Watch",
+  //     rating: 4.5,
+  //     reviews: 175,
+  //     price: 39900,
+  //     originalPrice: 45900,
+  //   },
+  //   {
+  //     id: 6,
+  //     name: "Canon EOS R50",
+  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Canon+Camera",
+  //     rating: 4.6,
+  //     reviews: 110,
+  //     price: 58990,
+  //     originalPrice: 64990,
+  //   },
+  // ];
   const totalPages = 5;
+  console.log("categories", categories);
+  console.log("Brands", brands);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div>
@@ -94,7 +116,7 @@ const Products = () => {
             <p className="text-base font-bold text-gray-900">Category</p>
             <form className="mt-3">
               <div className="space-y-2">
-                {categories.map((category) => (
+                {categories?.map((category) => (
                   <label
                     key={category.label}
                     className="flex items-center gap-2.5 cursor-pointer"
@@ -104,7 +126,7 @@ const Products = () => {
                       className="rounded text-primary focus:ring-primary h-4 w-4"
                     />
                     <span className="text-sm font-bold cursor-pointer">
-                      {category.label}
+                      {category.name}
                     </span>
                   </label>
                 ))}
@@ -123,7 +145,7 @@ const Products = () => {
                         className="rounded text-primary focus:ring-primary h-4 w-4"
                       />
                       <span className="text-sm font-bold cursor-pointer">
-                        {brand.label}
+                        {brand.name}
                       </span>
                     </label>
                   ))}
@@ -171,7 +193,7 @@ const Products = () => {
               <p className="text-gray-500 text-sm">
                 Showing{" "}
                 <span className="font-bold text-gray-900">
-                  {featuredProducts.length}
+                  {productsData.length}
                 </span>{" "}
                 products
               </p>
@@ -189,8 +211,11 @@ const Products = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {" "}
+              {productsData.map((product) => (
+                <Link to={`/products/${product._id}`} state={{ product }}>
+                  <ProductCard key={product.id} product={product} />
+                </Link>
               ))}
             </div>
             <div className="flex justify-center items-center mt-12">
