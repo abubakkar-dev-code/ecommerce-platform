@@ -1,44 +1,31 @@
 @import "tailwindcss";
+
 @theme {
-  /* Font */
-  --font-sans: "Inter", sans-serif;
-
-  /* Brand */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-
-  /* Background & Surface */
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-
-  /* Text */
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-
-  /* Border */
-  --color-border: #e2e8f0;
-
-  /* Status */
-  --color-success: #16a34a;
-  --color-error: #dc2626;
-  --color-warning: #d97706;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --color-primary: #5433b1;
+  --color-primary-hover: #42238e;
+  --color-background: #f8f7fb;
+  --color-surface: #f2eff8;
+  --color-text: #241b35;
+  --color-muted: #625871;
+  --color-border: #ded8e9;
+  --color-success: #166344;
+  --color-error: #a12543;
+  --color-warning: #87490e;
 }
 
-/* Global styles */
+body { margin: 0; font-family: var(--font-sans); background: var(--color-background); color: var(--color-text); }
+:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+button:enabled { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Inter", sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+@layer components {
+  .admin-page { @apply grid min-w-0 gap-5; }
+  .admin-heading { @apply text-3xl font-extrabold tracking-tight sm:text-4xl; }
+  .admin-panel { @apply min-w-0 rounded-2xl border border-border bg-white p-4 sm:p-5; }
+  .admin-input { @apply min-h-11 w-full min-w-0 rounded-xl border border-border bg-white px-3 py-2 text-sm; }
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Inter", sans-serif;
-  box-sizing: border-box;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

@@ -1,9 +1,2 @@
-import React from 'react'
-
-const Products = () => {
-  return (
-    <div>Products</div>
-  )
-}
-
-export default Products
+import CatalogManager from "./CatalogManager";
+export default function Products() { return <CatalogManager kind="products" />; }

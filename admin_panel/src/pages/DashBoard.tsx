@@ -1,60 +1,37 @@
-import React, { useState } from "react";
-import RevenueChart from "../componenets/charts/revenueCharts";
-import OrdersChart from "../componenets/charts/ordersChart";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { errorMessage, request } from "../adminApi";
 
-const DashBoard = () => {
-  const [revenueData, setRevenueData] = useState([
-    {
-      id: 1,
-      name: "Total Sales",
-      value: "$1000",
-      percentage: "20%",
-      status: "3.2%",
-      description: "Increased by 1,836 since last period",
-    },
-    {
-      id: 2,
-      name: "Total Order",
-      value: "$1000",
-      status: "+12%",
-      percentage: "20%",
-      description: "Increased by 1,056 since last period",
-    },
-    {
-      id: 3,
-      name: "Average Order value",
-      value: "$1000",
-      status: "-0.6%",
-      percentage: "20%",
-      description: "Decreased by 436 since last period",
-    },
-  ]);
-  return (
-    <>
-      <div className="grid grid-cols-3 gap-8">
-        {revenueData.map((data) => (
-          <div className="py-8 px-4 border border-gray-300 rounded-xl flex flex-col gap-5">
-            <div className="flex justify-between">
-              <h1 className="font-bold text-lg">{data.name}</h1>
-              <p>icon</p>
-            </div>
-            <div className="flex justify-between">
-              <p>{data.value}</p>
-              <p className="bg-green-300 p-1 rounded-lg text-xs font-bold">
-                {data.status}
-              </p>
-            </div>
-            <p className="font-semibold text-gray-500">{data.description}</p>
-          </div>
-        ))}
-      </div>
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 mt-4 gap-5">
-        <RevenueChart />
-        <OrdersChart />
-      </div>
-     
-    </>
-  );
-};
+type Metrics = { products: number; activeProducts: number; orders: number; pendingOrders: number; lowStockVariants: number; paidOrderTotal: number };
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
-export default DashBoard;
+export default function Dashboard() {
+  const [metrics, setMetrics] = useState<Metrics>();
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    request<Metrics>("/admin/dashboard", "GET", undefined, controller.signal).then(
+      ({ data }) => { if (!controller.signal.aborted) setMetrics(data); },
+      (failure: unknown) => { if (!controller.signal.aborted) setError(errorMessage(failure)); },
+    );
+    return () => controller.abort();
+  }, []);
+
+  return <section className="admin-page">
+    <h1 className="admin-heading">Dashboard</h1>
+    {error && <p role="alert" className="text-error">{error}</p>}
+    {!metrics && !error && <p role="status">Loading store metrics...</p>}
+    {metrics && <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {[
+        ["Products", metrics.products], ["Active products", metrics.activeProducts], ["Orders", metrics.orders],
+        ["Pending orders", metrics.pendingOrders], ["Low-stock variants", metrics.lowStockVariants],
+        ["Qualifying paid order total", currency.format(metrics.paidOrderTotal)],
+      ].map(([label, value]) => <div key={label} className="admin-panel">
+        <dt className="text-sm text-muted">{label}</dt><dd className="mt-2 text-2xl font-bold">{value}</dd>
+      </div>)}
+    </dl>}
+    <nav aria-label="Dashboard shortcuts" className="flex flex-wrap gap-4 text-sm font-semibold text-primary">
+      <Link to="/products">Products</Link><Link to="/inventory">Inventory</Link><Link to="/orders">Orders</Link>
+    </nav>
+  </section>;
+}

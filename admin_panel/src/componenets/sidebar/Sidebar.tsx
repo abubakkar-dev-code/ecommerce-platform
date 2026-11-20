@@ -1,16 +1,19 @@
-import { useState } from "react";
 import { CiLogout } from "react-icons/ci";
 import { FaBoxOpen, FaShoppingCart } from "react-icons/fa";
-import { IoIosLogOut, IoMdSettings } from "react-icons/io";
+import { IoMdSettings } from "react-icons/io";
 import {
   MdDashboard,
   MdOutlineInventory,
   MdOutlineLogout,
 } from "react-icons/md";
 import { TbBrandAdobe, TbCategoryFilled } from "react-icons/tb";
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
-const Sidebar = ({ isDrawerOpen, setIsDrawerOpen }) => {
+interface SidebarProps {
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+const Sidebar = ({ isDrawerOpen, setIsDrawerOpen }: SidebarProps) => {
   const navLinks = [
     {
       id: 1,
@@ -65,7 +68,7 @@ const Sidebar = ({ isDrawerOpen, setIsDrawerOpen }) => {
     <div>
       <h1 className="text-2xl font-bold">{isDrawerOpen ? "Nexora" : "N"}</h1>
       <div className={`flex flex-col gap-10 mt-10`}>
-        {isDrawerOpen&&<p>Main Menu</p>}
+        {isDrawerOpen && <p>Main Menu</p>}
         {navLinks.map((link) => (
           <div>
             <NavLink
@@ -75,29 +78,23 @@ const Sidebar = ({ isDrawerOpen, setIsDrawerOpen }) => {
                 `flex items-center gap-6 ${isActive ? "text-blue-600" : "text-black"}`
               }
             >
-              {isDrawerOpen ? (
-                <>
-                  <span className="flex justify-center items-center gap-5">
-                    <span className="text-xl">{link.icon}</span>
-                    {link.name}
-                  </span>
-                </>
-              ) : (
-                <span className="text-xl mt-3">{link.icon}</span>
-              )}
+              <span className="text-2xl">{link.icon}</span>
+              <span
+                className={`${isDrawerOpen ? "max-w-xs opacity-100" : "max-w-0 opacity-0"}`}
+              >
+                {link.name}
+              </span>
             </NavLink>
           </div>
         ))}
-        <p
+        <button
           className="flex justify-end"
           onClick={() => setIsDrawerOpen((prev) => !prev)}
         >
-          {isDrawerOpen ? (
-            <CiLogout className="text-3xl font-bold" />
-          ) : (
-            <IoIosLogOut className="text-3xl font-bold" />
-          )}
-        </p>
+          <CiLogout
+            className={`text-3xl shrink-0 font-bold transition-transform duration-300 ${isDrawerOpen ? "" : "rotate-180"}`}
+          />
+        </button>
       </div>
     </div>
   );
