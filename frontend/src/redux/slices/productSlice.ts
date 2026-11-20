@@ -1,6 +1,42 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
-const initialState = {
+export interface ProductVariant {
+  _id: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price: number;
+  comparedAt?: number | null;
+  inStock?: boolean;
+  inventory?: { varient: string; inStock: boolean } | null;
+}
+
+type ProductBrand = { _id: string; name: string; slug?: string; logo?: string };
+
+export interface Product {
+  _id: string;
+  name: string;
+  description?: string;
+  category: string;
+  categories?: { _id: string; name: string };
+  brand: string | ProductBrand;
+  brandDetails?: ProductBrand;
+  images: Array<{
+    primaryImage?: string;
+    thumbnails: Array<{
+      url: string;
+
+    }>;
+  }>;
+  rating?: number;
+  reviews?: number;
+  variants: ProductVariant[];
+}
+
+interface ProductState {
+  products: Product[];
+}
+
+const initialState: ProductState = {
   products: [],
 };
 
@@ -8,8 +44,8 @@ const productSlice = createSlice({
   name: "products",
   initialState,
   reducers: {
-    setproducts: (state, action) => {
-      state.products =action.payload
+    setproducts: (state, action: PayloadAction<Product[]>) => {
+      state.products = action.payload;
     },
   },
 });

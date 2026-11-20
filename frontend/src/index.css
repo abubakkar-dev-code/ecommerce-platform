@@ -1,37 +1,39 @@
 @import "tailwindcss";
 
 @theme {
-  /* Font */
-  --font-sans: "Inter", sans-serif;
-
-  /* Brand */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-
-  /* Background & Surface */
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-
-  /* Text */
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-
-  /* Border */
-  --color-border: #e2e8f0;
-
-  /* Status */
-  --color-success: #16a34a;
-  --color-error: #dc2626;
-  --color-warning: #d97706;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --color-primary: #5433b1;
+  --color-primary-hover: #42238e;
+  --color-background: #f8f7fb;
+  --color-surface: #f2eff8;
+  --color-text: #241b35;
+  --color-muted: #625871;
+  --color-border: #ded8e9;
+  --color-success: #166344;
+  --color-error: #a12543;
+  --color-warning: #87490e;
 }
 
-/* Global styles */
+html { scroll-padding-top: 5rem; }
+@media (min-width: 1024px) { html { scroll-padding-top: 9rem; } }
+body { margin: 0; font-family: var(--font-sans); background: var(--color-background); color: var(--color-text); }
+:where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+button:enabled, summary { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Inter", sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+@layer components {
+  .store-page { @apply mx-auto w-full max-w-7xl px-4 py-7 sm:px-6 sm:py-10 lg:px-8; }
+  .store-panel { @apply min-w-0 rounded-2xl border border-border bg-white p-4 sm:p-6; }
+  .store-input { @apply min-h-11 w-full min-w-0 rounded-xl border border-border bg-white px-3 py-2 text-sm; }
+  .store-button { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-55; }
+  .store-secondary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-primary hover:text-primary disabled:opacity-55; }
+  .store-title { @apply text-3xl font-extrabold tracking-tight sm:text-4xl; }
+  .store-empty { @apply rounded-2xl border border-dashed border-border bg-white p-6 text-sm text-muted sm:p-8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

@@ -1,105 +1,66 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Category from "../../componenets/categories/Category";
 import Hero from "../../componenets/hero/Hero";
+import CatalogImage from "../../componenets/products/CatalogImage";
 import ProductCard from "../../componenets/products/ProductCard";
-import { useEffect, useState } from "react";
-import productService from "../../services/productService";
-import { useDispatch, useSelector } from "react-redux";
-import { setproducts } from "../../redux/slices/productSlice";
-import type { RootState } from "../../redux/store";
+import type { Product } from "../../redux/slices/productSlice";
+import productService, { type CatalogOption } from "../../services/productService";
 
-const Home = () => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const dispatch = useDispatch();
+export default function Home() {
+  const [products, setProducts] = useState<Product[]>();
+  const [brands, setBrands] = useState<CatalogOption[]>();
+  const [categories, setCategories] = useState<CatalogOption[]>();
+  const [productError, setProductError] = useState(false);
+  const [brandError, setBrandError] = useState(false);
+
   useEffect(() => {
-    const fetchproducts = async () => {
-      setLoading(true);
-      try {
-        const res = await productService.getProducts();
-        setProducts(res.data);
-        dispatch(setproducts(res.data));
-      } catch (error) {
-        setError(error?.response?.data?.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchproducts();
+    const controller = new AbortController();
+    productService.getProducts({ limit: 4, sort: "newest" }, controller.signal).then(
+      ({ data }) => { if (!controller.signal.aborted) setProducts(data); },
+      () => { if (!controller.signal.aborted) setProductError(true); },
+    );
+    productService.getBrands().then(
+      (data) => { if (!controller.signal.aborted) setBrands(data); },
+      () => { if (!controller.signal.aborted) setBrandError(true); },
+    );
+    productService.getCategories().then(
+      (data) => { if (!controller.signal.aborted) setCategories(data); }, () => undefined,
+    );
+    return () => controller.abort();
   }, []);
-  const productsData = useSelector(
-    (state: RootState) => state.productInfo.products,
-  );
-  console.log(productsData)
-  const featuredProducts = [
-    {
-      id: 1,
-      name: "iPhone 15",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=iPhone+15",
-      rating: 4.5,
-      reviews: 120,
-      price: 79900,
-      originalPrice: 89000,
-    },
-    {
-      id: 2,
-      name: "Samsung Galaxy S24",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Galaxy+S24",
-      rating: 4.4,
-      reviews: 98,
-      price: 64999,
-      originalPrice: 74999,
-    },
-    {
-      id: 3,
-      name: "MacBook Air M2",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=MacBook+Air",
-      rating: 4.7,
-      reviews: 200,
-      price: 89900,
-      originalPrice: 99900,
-    },
-    {
-      id: 4,
-      name: "Sony Headphones",
-      image: "https://placehold.co/400x400/e2e8f0/64748b?text=Sony+Headphones",
-      rating: 4.6,
-      reviews: 150,
-      price: 7990,
-      originalPrice: 10990,
-    },
-  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-      <Hero />
+    <div className="store-page space-y-12 sm:space-y-16">
+      <Hero featured={products?.find((product) => product.images?.[0]?.primaryImage || product.images?.[0]?.thumbnails?.[0]?.url)} />
       <Category />
-
       <section>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">
-            Featured Products
-          </h2>
-          <Link
-            to="/products"
-            className="text-primary font-semibold text-sm hover:text-blue-700 flex items-center gap-1 group"
-          >
-            View All{" "}
-            <span className="group-hover:translate-x-1 transition-transform">
-              &rarr;
-            </span>
-          </Link>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold">New arrivals</h2>
+          <Link to="/products?sort=newest" className="text-sm font-semibold text-primary hover:underline">View all products</Link>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {productsData.slice(0,4).map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {productError ? <p role="alert">Products could not be loaded.</p>
+          : !products ? <div role="status" className="grid grid-cols-2 gap-4 lg:grid-cols-4"><span className="sr-only">Loading products</span>{[0, 1, 2, 3].map((item) => <div key={item} aria-hidden="true" className="h-56 rounded-2xl bg-surface motion-safe:animate-pulse" />)}</div>
+          : !products.length ? <p>No products are available yet.</p>
+          : <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+            {products.map((product) => <ProductCard key={product._id} product={product}
+              brandName={brands?.find((brand) => brand._id === product.brand)?.name}
+              categoryName={categories?.find((category) => category._id === product.category)?.name} />)}
+          </div>}
+      </section>
+      <section>
+        <h2 className="mb-5 text-2xl font-bold">Shop by brand</h2>
+        {brandError ? <p role="alert">Brands could not be loaded.</p>
+          : !brands ? <p role="status">Loading brands...</p>
+          : !brands.length ? <p>No brands are available yet.</p>
+          : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {brands.slice(0, 12).map((brand) => <Link key={brand._id} to={`/products?brand=${brand._id}`}
+              className="flex min-w-0 flex-col items-center gap-3 rounded-2xl border border-border bg-white p-4 text-center text-sm font-semibold hover:border-primary">
+              <CatalogImage src={brand.logo} alt="" className="size-14 rounded-lg bg-surface object-contain p-1" />
+              <span className="break-words">{brand.name}</span>
+            </Link>)}
+          </div>}
       </section>
     </div>
   );
-};
-
-export default Home;
+}

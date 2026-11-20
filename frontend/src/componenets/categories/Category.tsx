@@ -1,47 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import productService, { type CatalogOption } from "../../services/productService";
+import CatalogImage from "../products/CatalogImage";
+import { FiArrowUpRight } from "react-icons/fi";
 
-const Category = () => {
-  const [selectedCategory, setSelectedCategory] = useState("Mobiles");
-
-  const categories = [
-    "Mobiles",
-    "Laptops",
-    "Headphones",
-    "TV & Home Appliances",
-    "Smart Watches",
-    "Cameras",
-    "Gaming",
-  ];
+export default function Category() {
+  const [categories, setCategories] = useState<CatalogOption[]>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    productService.getCategories().then(
+      (items) => { if (mounted) setCategories(items.filter((item) => !item.parentCategory)); },
+      () => { if (mounted) setFailed(true); },
+    );
+    return () => { mounted = false; };
+  }, []);
 
   return (
-    <div className="w-full">
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
-        {categories.map((category) => {
-          const isSelected = selectedCategory === category;
-          return (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setSelectedCategory(category)}
-              className={`flex flex-col items-center justify-center p-4 sm:py-6 sm:px-3 rounded-2xl border bg-white transition-all duration-200 cursor-pointer min-h-32.5 hover:shadow-sm ${
-                isSelected
-                  ? "border-blue-500 ring-1 ring-blue-500/20"
-                  : "border-gray-200 hover:border-blue-400"
-              }`}
-            >
-              <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-blue-50/80 mb-3">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-              </div>
-              <span className="text-xs sm:text-sm font-semibold text-gray-800 text-center leading-tight">
-                {category}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <section aria-labelledby="browse-categories">
+      <h2 id="browse-categories" className="mb-5 text-2xl font-bold">Shop by category</h2>
+      {failed ? <p role="alert">Categories could not be loaded.</p>
+        : !categories ? <p role="status">Loading categories...</p>
+        : !categories.length ? <p>No categories are available yet.</p>
+        : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {categories.map((category) => (
+              <Link key={category._id} to={`/products?category=${category._id}`}
+                className="group overflow-hidden rounded-2xl border border-border bg-white transition hover:border-primary hover:shadow-sm">
+                <CatalogImage src={category.image} alt="" className="aspect-[4/3] w-full bg-surface object-cover" />
+                <span className="flex items-center justify-between gap-2 p-4 text-sm font-semibold group-hover:text-primary"><span className="min-w-0 break-words">{category.name}</span><FiArrowUpRight className="shrink-0" aria-hidden="true" /></span>
+              </Link>
+            ))}
+          </div>}
+    </section>
   );
-};
-
-export default Category;
-
+}

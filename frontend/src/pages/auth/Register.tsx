@@ -1,9 +1,12 @@
+import PasswordInput from "../../componenets/UI/PasswordInput";
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -26,64 +29,77 @@ const Register = () => {
       const response = await authService.register(formData);
       if (response) {
         toast.success("Registered successfully");
-        console.log(response);
+        navigate("/auth/login", { replace: true });
       }
     } catch (error) {
       toast.error("Registration failed");
-      setErrors(error?.response?.data?.message);
+      const message = isAxiosError<{ message?: unknown }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      setErrors(typeof message === "string" ? message : "Registration failed");
     } finally {
       setLoading(false);
     }
   };
   return (
-    <div className="flex justify-center items-center h-screen">
-      <div className="bg-background shadow-lg px-10 py-10  rounded-xl w-[30%]">
-        <div className="text-center mb-3">
-          <h1 className="text-2xl font-bold">Create new Account</h1>
-          <p className="text-muted font-bold mt-2 text-medium">
-            Create your account to get started
+    <div className="grid place-items-center px-1 py-6">
+      <div className="store-panel w-full max-w-md">
+        <div className="mb-3">
+          <h1 className="text-2xl font-bold">Create your account</h1>
+          <p className="mt-2 text-sm text-muted">
+            Save items and track your orders.
           </p>
         </div>
-        <div className="mt-10">
+        <div className="mt-7">
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col">
-              <label className="mb-2 font-bold text-sm">Nmae</label>
+              <label htmlFor="name" className="mb-2 font-bold text-sm">Name</label>
               <input
-                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                className="store-input"
                 type="text"
                 name="name"
+                id="name"
+                autoComplete="name"
+                required
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Enter your full name"
               />
             </div>
             <div className="flex flex-col mt-5">
-              <label className="mb-2 font-bold text-sm">Email</label>
+              <label htmlFor="email" className="mb-2 font-bold text-sm">Email</label>
               <input
-                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                className="store-input"
                 type="email"
                 name="email"
+                id="email"
+                autoComplete="email"
+                required
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="Enter your email address"
               />
             </div>
             <div className="flex flex-col mt-5">
-              <label className="mb-2 font-bold text-sm">Password</label>
-              <input
-                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
-                type="password"
+              <label htmlFor="password" className="mb-2 font-bold text-sm">Password</label>
+              <PasswordInput
+                className="store-input"
+
                 name="password"
+                id="password"
+                autoComplete="new-password"
+                required
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
               />
             </div>
-            <p className="text-red-600 text-semibold text-sm mt-4">{errors}</p>
+            <p role="alert" className="text-red-600 text-semibold text-sm mt-4">{errors}</p>
             <div className="mt-5 flex flex-col gap-5">
               <button
                 type="submit"
-                className="bg-primary py-2 rounded-lg text-white font-bold"
+                disabled={loading}
+                className="store-button w-full"
               >
                 {loading ? (
                   <>
@@ -95,19 +111,7 @@ const Register = () => {
                   "Register"
                 )}
               </button>
-              <button
-                type="button"
-                className="border border-gray-400 py-2 rounded-lg font-bold"
-                onClick={(e) =>
-                  toast.custom(
-                    <div className="border-2 border-yellow-500 bg-yellow-100 text-yellow-700 p-4 rounded">
-                      The Future is coming soon
-                    </div>,
-                  )
-                }
-              >
-                Continue with Google
-              </button>
+
             </div>
             <div className="mt-5 text-center">
               <p className="mb-2 text-muted font-bold text-sm">

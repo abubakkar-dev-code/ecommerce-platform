@@ -1,231 +1,199 @@
 import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Pagination from "../../componenets/products/Pagination";
 import ProductCard from "../../componenets/products/ProductCard";
+import type { Product } from "../../redux/slices/productSlice";
+import productService, { type CatalogOption, type CatalogPagination } from "../../services/productService";
+import apiError from "../../services/apiError";
+import Drawer from "../../componenets/UI/Drawer";
+import { FiSliders } from "react-icons/fi";
 
-import type { RootState } from "../../redux/store";
-import { useSelector } from "react-redux";
-import productService from "../../services/productService";
-import { Link } from "react-router-dom";
+const limit = 9;
+const sorts = [
+  ["newest", "Newest"], ["oldest", "Oldest"], ["price-asc", "Price, low to high"], ["price-desc", "Price, high to low"],
+];
+const objectId = /^[a-f\d]{24}$/i;
+const validPrice = /^\d+(?:\.\d{1,2})?$/;
 
-const Products = () => {
-  const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+type Result = { key: string; data: Product[]; pagination: CatalogPagination; brandIds?: string[] } | { key: string; error: string };
+type Options = { categories: CatalogOption[]; brands: CatalogOption[] };
 
-  useEffect(() => {}, []);
-  const productsData = useSelector(
-    (state: RootState) => state.productInfo.products,
-  );
-  console.log(productsData);
+export default function Products() {
+  const [params, setParams] = useSearchParams();
+  const [result, setResult] = useState<Result>();
+  const [options, setOptions] = useState<Options>();
+  const [optionError, setOptionError] = useState(false);
+  const [children, setChildren] = useState<{ category: string; data: CatalogOption[] }>();
+  const [attempt, setAttempt] = useState(0);
+  const selected = params.get("category") || "";
+  const category = objectId.test(selected) ? selected : "";
+  const brandParam = params.get("brand") || "";
+  const brand = objectId.test(brandParam) ? brandParam : "";
+  const search = params.get("search")?.trim().slice(0, 100) || "";
+  const minimum = params.get("minPrice") || "";
+  const maximum = params.get("maxPrice") || "";
+  const minPrice = validPrice.test(minimum) && Number(minimum) <= 1e9 ? minimum : "";
+  const maxPrice = validPrice.test(maximum) && Number(maximum) <= 1e9 ? maximum : "";
+  const sort = sorts.find(([value]) => value === params.get("sort"))?.[0] || "newest";
+  const rawPage = params.get("page") || "";
+  const currentPage = /^[1-9]\d*$/.test(rawPage) && Number(rawPage) <= 10_000 ? Number(rawPage) : 1;
+  const requestKey = JSON.stringify([category, brand, search, minPrice, maxPrice, sort, currentPage, attempt]);
+  const current = result?.key === requestKey ? result : undefined;
+  const categoryInfo = options?.categories.find((item) => item._id === category);
+  const slug = categoryInfo?.slug;
+  const childOptions = children?.category === category ? children.data
+    : options?.categories.filter((item) => item.parentCategory === category);
+  const products = current && "data" in current ? current.data : [];
+  const pagination = current && "pagination" in current ? current.pagination : undefined;
+  const relevantBrands = current && "data" in current ? current.brandIds : undefined;
+  const error = current && "error" in current ? current.error : undefined;
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [fetchCategories, fetchBrands] = await Promise.all([
-          productService.getCategories(),
-          productService.getBrands(),
-        ]);
-        setCategories(fetchCategories.data);
-        setBrands(fetchBrands.data);
-      } catch (error) {
-        setError(error?.response?.data?.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    let active = true;
+    Promise.all([productService.getCategories(), productService.getBrands()]).then(
+      ([categories, brands]) => { if (active) setOptions({ categories, brands }); },
+      () => { if (active) setOptionError(true); },
+    );
+    return () => { active = false; };
   }, []);
-  const filters = [
-    "Newest",
-    "Oldest",
-    "Price:Low to High",
-    "Price:High to Low",
-  ];
-  // const featuredProducts = [
-  //   {
-  //     id: 1,
-  //     name: "iPhone 15",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=iPhone+15",
-  //     rating: 4.5,
-  //     reviews: 120,
-  //     price: 79900,
-  //     originalPrice: 89000,
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "Samsung Galaxy S24",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Galaxy+S24",
-  //     rating: 4.4,
-  //     reviews: 98,
-  //     price: 64999,
-  //     originalPrice: 74999,
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "MacBook Air M2",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=MacBook+Air",
-  //     rating: 4.7,
-  //     reviews: 200,
-  //     price: 89900,
-  //     originalPrice: 99900,
-  //   },
-  //   {
-  //     id: 4,
-  //     name: "Sony Headphones",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Sony+Headphones",
-  //     rating: 4.6,
-  //     reviews: 150,
-  //     price: 7990,
-  //     originalPrice: 10990,
-  //   },
-  //   {
-  //     id: 5,
-  //     name: "Apple Watch Series 9",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Apple+Watch",
-  //     rating: 4.5,
-  //     reviews: 175,
-  //     price: 39900,
-  //     originalPrice: 45900,
-  //   },
-  //   {
-  //     id: 6,
-  //     name: "Canon EOS R50",
-  //     image: "https://placehold.co/400x400/e2e8f0/64748b?text=Canon+Camera",
-  //     rating: 4.6,
-  //     reviews: 110,
-  //     price: 58990,
-  //     originalPrice: 64990,
-  //   },
-  // ];
-  const totalPages = 5;
-  console.log("categories", categories);
-  console.log("Brands", brands);
+
+  useEffect(() => {
+    if (!slug) return;
+    let active = true;
+    productService.getSubcategories(slug).then(
+      (data) => { if (active) setChildren({ category, data }); },
+      () => { /* The active category list already contains parent relationships. */ },
+    );
+    return () => { active = false; };
+  }, [category, slug]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    productService.getProducts({
+      page: currentPage, limit, sort, category: category || undefined, brand: brand || undefined,
+      includeSubcategories: category ? "true" : undefined,
+      search: search || undefined, minPrice: minPrice || undefined, maxPrice: maxPrice || undefined,
+    }, controller.signal).then(
+      (response) => { if (!controller.signal.aborted) setResult({ key: requestKey, ...response }); },
+      (failure: unknown) => {
+        if (!controller.signal.aborted) setResult({ key: requestKey, error: apiError(failure, "Could not load products.") });
+      },
+    );
+    return () => controller.abort();
+  }, [requestKey, currentPage, sort, category, brand, search, minPrice, maxPrice]);
+
+  const change = (values: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    next.delete("page");
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    setParams(next);
+  };
+
+  const fieldClass = "store-input";
+
+  const filterControls = <>
+          {optionError && <p role="alert" className="text-sm text-error">Some filters could not be loaded.</p>}
+          {!options && !optionError && <p role="status" className="text-sm text-muted">Loading filters...</p>}
+          <label className="grid gap-1 text-sm font-semibold">Category
+            <select className={fieldClass} value={category} onChange={(event) => change({ category: event.target.value, brand: "" })}>
+              <option value="">All categories</option>
+              {options?.categories.filter((item) => !item.parentCategory || item._id === category)
+                .map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-semibold">Brand
+            <select className={fieldClass} value={brand} onChange={(event) => change({ brand: event.target.value })}>
+              <option value="">All brands</option>
+              {options?.brands.filter((item) => !relevantBrands || relevantBrands.includes(item._id) || item._id === brand).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+            </select>
+          </label>
+          <form key={JSON.stringify([minPrice, maxPrice])} className="grid gap-3" onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const min = String(data.get("minPrice"));
+            const max = String(data.get("maxPrice"));
+            const maximumInput = event.currentTarget.elements.namedItem("maxPrice") as HTMLInputElement;
+            if (min && max && Number(min) > Number(max)) {
+              maximumInput.setCustomValidity("Maximum price must be at least the minimum price.");
+              maximumInput.reportValidity();
+              return;
+            }
+            change({ minPrice: min ? String(Number(min)) : "", maxPrice: max ? String(Number(max)) : "" });
+          }}>
+            <div className="grid grid-cols-2 gap-2" onChange={(event) => {
+              const field = event.currentTarget.querySelector<HTMLInputElement>('[name="maxPrice"]');
+              field?.setCustomValidity("");
+            }}>
+              <label className="grid gap-1 text-sm font-semibold">Min price
+                <input name="minPrice" defaultValue={minPrice} className={fieldClass} type="number" min="0" max="1000000000" step="0.01" />
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">Max price
+                <input name="maxPrice" defaultValue={maxPrice} className={fieldClass} type="number" min="0" max="1000000000" step="0.01" />
+              </label>
+            </div>
+            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Apply price range</button>
+          </form>
+          <Link to="/products" className="text-center text-sm font-semibold text-primary hover:underline">Clear filters</Link>
+  </>;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div>
-        <div className="mt-4">
-          <h1 className="text-3xl font-bold text-gray-900">All Products</h1>
-          <p className="text-gray-500 font-medium mt-1 text-base">
-            Explore our collection of products.
-          </p>
+    <div className="store-page">
+      <h1 className="store-title">{categoryInfo?.name ?? "All products"}</h1>
+      {search && <p className="mt-2 text-muted">Results for “{search}”</p>}
+      {categoryInfo?.parentCategory && <Link className="mt-2 inline-block text-sm font-semibold text-primary"
+        to={`/products?category=${categoryInfo.parentCategory}`}>Back to parent category</Link>}
+      {!!childOptions?.length && (
+        <nav aria-label="Subcategories" className="mt-4 flex flex-wrap gap-2">
+          {childOptions.map((item) => <button key={item._id} type="button" onClick={() => change({ category: item._id, brand: "" })}
+            className="rounded-full border border-border px-4 py-2 text-sm hover:border-primary">{item.name}</button>)}
+        </nav>
+      )}
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside className="store-panel hidden gap-4 lg:sticky lg:top-32 lg:grid" aria-label="Product filters">
+          <h2 className="text-lg font-bold">Filters</h2>
+          {filterControls}
+        </aside>
+        <div className="lg:hidden">
+          <Drawer closeAt={1024} title="Product filters" label={<><FiSliders aria-hidden="true" /> Filters</>}>
+            <div className="grid gap-4">{filterControls}</div>
+            <form method="dialog" className="mt-5"><button className="store-button w-full">Show products</button></form>
+          </Drawer>
         </div>
-        <div className="flex flex-col lg:flex-row gap-8 mt-8">
-          {/* filters sidebar */}
-          <div className="w-full lg:w-64 shrink-0 border border-border bg-white rounded-xl p-6 h-fit">
-            <p className="text-base font-bold text-gray-900">Category</p>
-            <form className="mt-3">
-              <div className="space-y-2">
-                {categories?.map((category) => (
-                  <label
-                    key={category.label}
-                    className="flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      className="rounded text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-sm font-bold cursor-pointer">
-                      {category.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-border">
-                <p className="text-base font-bold text-gray-900 mb-3">Brands</p>
-                <div className="space-y-2">
-                  {brands.map((brand) => (
-                    <label
-                      key={brand.label}
-                      className="flex items-center gap-2.5 cursor-pointer font-bold"
-                    >
-                      <input
-                        type="checkbox"
-                        className="rounded text-primary focus:ring-primary h-4 w-4"
-                      />
-                      <span className="text-sm font-bold cursor-pointer">
-                        {brand.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-border">
-                <p className="text-base font-bold text-gray-900 mb-3">
-                  Price Range
-                </p>
-                <div className="flex gap-3 items-center">
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    className="border border-border bg-surface w-full py-2 px-3 rounded-md focus:outline-primary text-sm"
-                  />
-                  <span className="text-gray-400">-</span>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    className="border border-border bg-surface w-full py-2 px-3 rounded-md focus:outline-primary text-sm"
-                  />
-                </div>
-                <div className="space-y-2 mt-6">
-                  <button
-                    type="button"
-                    className="bg-primary font-semibold text-white px-4 py-2 rounded-lg w-full hover:bg-primary-hover transition-colors"
-                  >
-                    Apply
-                  </button>
-                  <button
-                    type="button"
-                    className="border border-gray-200 text-gray-600 font-semibold px-4 py-2 rounded-lg w-full hover:bg-gray-50 transition-colors"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            </form>
+        <section aria-label="Products" aria-busy={!current}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p aria-live="polite" className="text-sm text-muted">{pagination ? `${pagination.totalProducts} products` : ""}</p>
+            <label className="flex items-center gap-2 text-sm font-semibold">Sort
+              <select className={fieldClass} value={sort} onChange={(event) => change({ sort: event.target.value })}>
+                {sorts.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+              </select>
+            </label>
           </div>
-
-          {/* products area */}
-          <div className="flex-1">
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-gray-500 text-sm">
-                Showing{" "}
-                <span className="font-bold text-gray-900">
-                  {productsData.length}
-                </span>{" "}
-                products
-              </p>
-              <div>
-                <select className="border border-border rounded-lg px-3 py-2 bg-white text-sm focus:outline-primary font-medium text-gray-700">
-                  <option value="" disabled selected>
-                    Sort by
-                  </option>
-                  {filters.map((filter) => (
-                    <option key={filter} value={filter}>
-                      {filter}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {" "}
-              {productsData.map((product) => (
-                <Link to={`/products/${product._id}`} state={{ product }}>
-                  <ProductCard key={product.id} product={product} />
-                </Link>
-              ))}
-            </div>
-            <div className="flex justify-center items-center mt-12">
-              <Pagination totalPages={totalPages} />
-            </div>
+          {!current && <div role="status" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <span className="sr-only">Loading products</span>
+            {[0, 1, 2].map((item) => <div key={item} aria-hidden="true" className="h-72 rounded-2xl bg-slate-100 motion-safe:animate-pulse" />)}
+          </div>}
+          {error && <div role="alert" className="rounded-xl border border-border p-5">{error}
+            <button type="button" className="ml-3 font-semibold text-primary" onClick={() => setAttempt((value) => value + 1)}>Retry</button>
+          </div>}
+          {pagination && !products.length && <div className="rounded-xl border border-border p-5 text-muted">
+            <p>{pagination.totalProducts ? "No products on this page." : "No products match these filters."}</p>
+            {currentPage > 1 && <button type="button" onClick={() => change({})}
+              className="mt-2 text-sm font-semibold text-primary hover:underline">Back to the first page</button>}
+          </div>}
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-3">
+            {products.map((product) => <ProductCard key={product._id} product={product}
+              brandName={options?.brands.find((item) => item._id === product.brand)?.name}
+              categoryName={options?.categories.find((item) => item._id === product.category)?.name} />)}
           </div>
-        </div>
+          {pagination && pagination.totalPages > 1 && <div className="mt-8 flex justify-center">
+            <Pagination currentPage={Math.min(currentPage, pagination.totalPages)} totalPages={Math.min(10000, pagination.totalPages)}
+              onPageChange={(page) => change({ page: String(page) })} />
+          </div>}
+        </section>
       </div>
     </div>
   );
-};
-
-export default Products;
+}

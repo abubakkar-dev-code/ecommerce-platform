@@ -1,497 +1,160 @@
-import React, { useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import accountService, { type Address, type AddressInput, type BuyNow } from "../../services/accountService";
+import cartService, { type Cart } from "../../services/cartService";
+import apiError from "../../services/apiError";
+import TestPayment from "./TestPayment";
+import productService from "../../services/productService";
+import CatalogImage from "../../componenets/products/CatalogImage";
+import { isAxiosError } from "axios";
 
+const addressFields = [
+  ["fullName", "Full name", "name"], ["phone", "Phone", "tel"],
+  ["addressLine1", "Street address", "address-line1"], ["addressLine2", "Address line 2 (optional)", "address-line2"],
+  ["city", "City", "address-level2"],
+  ["state", "State", "address-level1"], ["pincode", "Postal code", "postal-code"], ["country", "Country", "country-name"],
+] as const;
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
-const Checkout = () => {
-  const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
-  const [formMode, setFormMode] = useState<"add" | "edit" | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState("online Payment");
-
-  const [addressData, setAddressData] = useState([
-    {
-      id: 1,
-      name: "John Doe",
-      phone: "9876543210",
-      line1: "12 Main Street",
-      city: "Chennai",
-      state: "Tamil Nadu",
-      pincode: "600001",
-    },
-    {
-      id: 2,
-      name: "John Doe",
-      phone: "9876543210",
-      line1: "12 Main Street",
-      city: "Chennai",
-      state: "Tamil Nadu",
-      pincode: "600001",
-    },
-  ]);
-  const orderItems = [
-    {
-      id: 1,
-      name: "Aero Wireless Headphones",
-      image: "/images/aero-headphones.jpg",
-      variant: "Color: Midnight Blue",
-      stock: "In stock",
-      price: 129.0,
-      quantity: 2,
-    },
-    {
-      id: 2,
-      name: "Pulse Smart Watch",
-      image: "/images/pulse-watch.jpg",
-      variant: "Size: 44mm · Strap: Silver",
-      stock: "Only 3 left",
-      price: 199.0,
-      quantity: 1,
-    },
-    {
-      id: 3,
-      name: "Urban Leather Backpack",
-      image: "/images/urban-backpack.jpg",
-      variant: "Color: Tan · 20L",
-      stock: "In stock",
-      price: 79.0,
-      quantity: 2,
-    },
-  ];
-  const orderSummary = [
-    {
-      label: "subtotal",
-      value: "$130.00",
-    },
-    {
-      label: "shipping",
-      value: "$20.00",
-    },
-    {
-      label: "tax",
-      value: "$10.00",
-    },
-    {
-      label: "total",
-      value: "$160.00",
-      isBold: true,
-    },
-  ];
-  const paymentMethods = [
-    { id: 1, name: "online Payment", description: "UPI/creditcard/Netbanking" },
-    {
-      id: 2,
-      name: "Cash On Delivery",
-      description: "Pay when you receive the product",
-    },
-  ];
-  const [formData, setFormData] = useState({
-    id: 0,
-    name: "",
-    phone: "",
-    line1: "",
-    city: "",
-    state: "",
-    pincode: "",
-  });
-
-  const handleAddressChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleClick = () => {
-    if (formMode === "add") {
-      const newAddress = {
-        id: addressData.length + 1,
-        name: formData.name,
-        phone: formData.phone,
-        line1: formData.line1,
-        city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode,
-      };
-
-      setAddressData((prev) => [...prev, newAddress]);
-    }
-    if (formMode === "edit") {
-      setAddressData((prev) =>
-        prev.map((address) =>
-          address.id === formData.id
-            ? {
-                ...address,
-                name: formData.name,
-                phone: formData.phone,
-                line1: formData.line1,
-                city: formData.city,
-                state: formData.state,
-                pincode: formData.pincode,
-              }
-            : address,
-        ),
-      );
-    }
-    setFormData({
-      id: 0,
-      name: "",
-      phone: "",
-      line1: "",
-      city: "",
-      state: "",
-      pincode: "",
+async function getDirectCheckout(intent: BuyNow, signal: AbortSignal): Promise<Cart> {
+  const product = await productService.getProductById(intent.productId, signal);
+  const variant = product.variants.find((entry) => entry._id === intent.variantId);
+  if (!variant || !Number.isFinite(variant.price)) throw new Error("The selected variant is unavailable.");
+  const stock = await productService.getVariantAvailability(variant._id, signal, intent.quantity)
+    .then((value) => value ? "in-stock" as const : "out-of-stock" as const)
+    .catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return isAxiosError(error) && error.response?.status === 404 ? "unavailable" as const : "unknown" as const;
     });
-    setFormMode(null);
+  const image = product.images?.[0];
+  const itemTotal = Math.round(variant.price * 100) * intent.quantity / 100;
+  return { cartItems: [{
+    _id: variant._id, product: { _id: product._id, name: product.name, isActive: true },
+    varient: { ...variant, isActive: true }, quantity: intent.quantity, price: variant.price, itemTotal,
+    image: image?.primaryImage || image?.thumbnails?.[0]?.url, availability: stock,
+  }], totalAmount: itemTotal };
+}
+
+export default function Checkout() {
+  const [params] = useSearchParams();
+  if (!["product", "variant", "quantity"].some((key) => params.has(key))) return <CheckoutContent />;
+  const productId = params.get("product")?.toLowerCase() ?? "";
+  const variantId = params.get("variant")?.toLowerCase() ?? "";
+  const quantity = Number(params.get("quantity"));
+  if (!/^[a-f\d]{24}$/i.test(productId) || !/^[a-f\d]{24}$/i.test(variantId) ||
+      !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1_000_000) {
+    return <p role="alert" className="mx-auto max-w-5xl p-5">This checkout link is invalid. <Link to="/products" className="text-primary">Browse products</Link></p>;
+  }
+  return <CheckoutContent key={params.toString()} buyNow={{ productId, variantId, quantity }} />;
+}
+
+function CheckoutContent({ buyNow }: { buyNow?: BuyNow }) {
+  const [addresses, setAddresses] = useState<Address[]>();
+  const [cart, setCart] = useState<Cart>();
+  const [editing, setEditing] = useState<Address | "new">();
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+
+  useEffect(() => {
+    const request = new AbortController();
+    Promise.all([accountService.getAddresses(request.signal), buyNow ? getDirectCheckout(buyNow, request.signal) : cartService.getCart(request.signal)]).then(
+      ([saved, basket]) => { if (!request.signal.aborted) { setAddresses(saved); setCart(basket); } },
+      (failure: unknown) => { if (!request.signal.aborted) setError(apiError(failure, buyNow ? "Could not load the selected item." : "Could not load checkout.")); },
+    );
+    return () => request.abort();
+  }, [buyNow]);
+
+  const update = async (action: () => Promise<unknown>, message: string) => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await action();
+      setEditing(undefined);
+      setAddresses(await accountService.getAddresses());
+      setNotice(message);
+    } catch (failure) {
+      setError(apiError(failure, "Could not update your addresses."));
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold">Checkout</h1>
-      <div className="flex gap-8 mt-6">
-        <div className="border border-gray-300 w-[70%] rounded-xl p-6">
-          <h2 className="text-xl font-bold mb-4">Delivery Address</h2>
-          <div className="space-y-3">
-            {formMode === "add" || formMode === "edit" ? (
-              <div className="bg-white border border-border rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-text mb-6">
-                  Add Delivery Address
-                </h3>
-                <form className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-2">
-                      Name
-                    </label>
-                    <input
-                      name="name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={formData.name}
-                      onChange={handleAddressChange}
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background text-text outline-none transition focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-2">
-                      Phone
-                    </label>
-                    <input
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleAddressChange}
-                      placeholder="Enter your phone number"
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background placeholder:text-muted outline-none transition focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-text mb-2">
-                      Address
-                    </label>
-                    <textarea
-                      name="line1"
-                      rows={3}
-                      value={formData.line1}
-                      onChange={handleAddressChange}
-                      placeholder="House number, street, area"
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background placeholder:text-muted outline-none transition resize-y focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-2">
-                      City
-                    </label>
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const fields = Object.fromEntries(addressFields.map(([name]) => [name, String(form.get(name) ?? "").trim()]));
+    const body = { ...fields, isDefault: form.has("isDefault") } as AddressInput;
+    if (Object.entries(fields).some(([key, value]) => key !== "addressLine2" && !value)) {
+      setError("Complete all address fields.");
+      return;
+    }
+    void update(() => accountService.saveAddress(body, typeof editing === "object" ? editing._id : undefined), "Address saved.");
+  };
 
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleAddressChange}
-                      placeholder="Enter your city"
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background placeholder:text-muted outline-none transition focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-2">
-                      State
-                    </label>
-
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleAddressChange}
-                      placeholder="Enter your state"
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background placeholder:text-muted outline-none transition focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-2">
-                      Pincode
-                    </label>
-                    <input
-                      type="text"
-                      name="pincode"
-                      value={formData.pincode}
-                      onChange={handleAddressChange}
-                      inputMode="numeric"
-                      placeholder="Enter your pincode"
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-background placeholder:text-muted outline-none transition focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormMode(null)}
-                      className="px-5 py-2.5 border border-border rounded-lg text-text font-medium hover:bg-background transition"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClick}
-                      className="px-5 py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover transition"
-                    >
-                      {formMode === "edit" ? "Update Address" : "Add Address"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              addressData.map((address) => {
-                const isSelected = selectedAddressId === address.id;
-
-                return (
-                  <div
-                    key={address.id}
-                    onClick={() => setSelectedAddressId(address.id)}
-                    className={`flex justify-between p-5 border rounded-xl cursor-pointer transition-all ${
-                      isSelected
-                        ? "border-primary bg-blue-50/40 ring-1 ring-primary"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="flex gap-4 items-start">
-                      <input
-                        type="radio"
-                        name="delivery-address"
-                        checked={isSelected}
-                        onChange={() => setSelectedAddressId(address.id)}
-                        className="mt-1 h-5 w-5 text-primary accent-primary cursor-pointer"
-                      />
-
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {address.name}
-                        </h3>
-
-                        <p className="text-gray-600 text-sm">{address.line1}</p>
-
-                        <p className="text-gray-600 text-sm">
-                          {address.city}, {address.state} - {address.pincode}
-                        </p>
-
-                        <p className="text-gray-500 text-sm mt-1">
-                          Phone: {address.phone}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFormData({
-                          id: address.id,
-                          name: address.name,
-                          phone: address.phone,
-                          line1: address.line1,
-                          city: address.city,
-                          state: address.state,
-                          pincode: address.pincode,
-                        });
-                        setFormMode("edit");
-                      }}
-                      className="text-primary font-semibold text-sm hover:underline self-start"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                );
-              })
-            )}
-
-            <div>
-              <button
-                type="button"
-                onClick={() => {
-                  setFormData({
-                    id: 0,
-                    name: "",
-                    phone: "",
-                    line1: "",
-                    city: "",
-                    state: "",
-                    pincode: "",
-                  });
-
-                  setFormMode("add");
-                }}
-                className="text-white text-sm font-semibold px-6 py-3 rounded-lg mt-5 bg-primary"
-              >
-                + Add address
-              </button>
+  const currentAddress = typeof editing === "object" ? editing : undefined;
+  return <section className="store-page space-y-5">
+    <Link to="/cart" className="text-sm font-semibold text-primary hover:underline">Back to cart</Link>
+    <h1 className="store-title">Checkout</h1>
+    {error && <p role="alert" className="text-error">{error}</p>}
+    {notice && <p role="status" className="text-success">{notice}</p>}
+    {!addresses && !error && <div role="status" className="store-empty">Loading checkout...<div aria-hidden="true" className="mt-4 h-32 rounded-xl bg-surface motion-safe:animate-pulse" /></div>}
+    {addresses && cart && <div className="grid items-start gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <section id="shipping-addresses" className="store-panel space-y-4">
+        <div className="flex flex-wrap justify-between gap-2">
+          <h2 className="font-bold">Shipping addresses</h2>
+          <button type="button" disabled={busy} onClick={() => setEditing("new")} className="text-sm font-semibold text-primary">Add address</button>
+        </div>
+        {!addresses.length && <p className="text-sm text-muted">Add an address for your next order.</p>}
+        {addresses.map((address) => <div key={address._id} className="flex flex-wrap items-start justify-between gap-3 border-t border-border pt-3">
+          <div className="min-w-0 break-words text-sm">
+            <p className="font-semibold">{address.fullName}{address.isDefault && " · Default"}</p>
+            <p>{address.addressLine1}{address.addressLine2 && `, ${address.addressLine2}`}</p>
+            <p>{address.city}, {address.state} {address.pincode}, {address.country}</p>
+          </div>
+          <div className="flex gap-3 text-sm">
+            <button type="button" disabled={busy} onClick={() => setEditing(address)} className="text-primary">Edit</button>
+            <button type="button" disabled={busy} onClick={() => {
+              if (window.confirm("Remove this address?")) void update(() => accountService.deleteAddress(address._id), "Address removed.");
+            }} className="text-error">Remove</button>
+          </div>
+        </div>)}
+        {editing && <form key={currentAddress?._id ?? "new"} onSubmit={save} className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+          {addressFields.map(([name, label, autocomplete]) => <label key={name} className="grid gap-1 text-sm font-semibold">{label}
+            <input name={name} required={name !== "addressLine2"} defaultValue={currentAddress?.[name]} type={name === "phone" ? "tel" : "text"}
+              autoComplete={autocomplete} className="store-input" />
+          </label>)}
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isDefault" defaultChecked={currentAddress?.isDefault ?? !addresses.length} /> Default address</label>
+          <div className="flex gap-3 sm:col-span-2">
+            <button disabled={busy} className="store-button">Save address</button>
+            <button type="button" disabled={busy} onClick={() => setEditing(undefined)}>Cancel</button>
+          </div>
+        </form>}
+      </section>
+      <aside className="store-panel space-y-4">
+        <h2 className="font-bold">{buyNow ? "Buy Now summary" : "Cart summary"}</h2>
+        {!cart.cartItems.length && <p className="text-sm text-muted">Your cart is empty.</p>}
+        {cart.cartItems.map((item) => <div key={item._id} className="flex justify-between gap-3 text-sm">
+          <div className="flex min-w-0 gap-3">
+            <CatalogImage src={item.image} alt="" className="size-12 shrink-0 rounded-lg bg-surface object-contain" />
+            <div className="min-w-0 break-words"><p>{item.product?.name ?? "Unavailable product"}</p>
+              {item.varient && <p className="text-muted">{Object.values(item.varient.attributes ?? {}).join(" · ") || item.varient.sku}</p>}
+              <p className="text-muted">{currency.format(item.price)} × {item.quantity}</p>
             </div>
           </div>
-        </div>
-
-        {/* order-summary */}
-        <div className="border border-gray-200 w-[30%] h-fit rounded-xl p-6 sticky top-24">
-          <div>
-            <h1 className="text-2xl font-bold">Order Summary</h1>
-
-            <div className="mt-8 flex flex-col gap-4">
-              {orderSummary.map((order) => (
-                <div
-                  key={order.label}
-                  className="flex justify-between items-center"
-                >
-                  <p
-                    className={`${
-                      order.isBold
-                        ? "text-black font-bold text-xl capitalize"
-                        : "text-sm text-gray-500 font-medium capitalize"
-                    }`}
-                  >
-                    {order.label}
-                  </p>
-
-                  <p
-                    className={`${
-                      order.isBold
-                        ? "text-black font-bold text-xl"
-                        : "font-semibold text-gray-800"
-                    }`}
-                  >
-                    {order.value}
-                  </p>
-                </div>
-              ))}
-              <p className="text-sm font-semibold flex gap-4">Payment:<span className="text-green-600">{paymentMethod}</span></p>
-              <div className="w-full h-px bg-gray-200 my-2"></div>
-
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => alert("Order Placed Successfully!")}
-                  className="bg-primary text-white px-4 py-3 rounded-xl w-full font-semibold hover:bg-primary-hover shadow-md hover:shadow-lg transition-all active:scale-[0.99]"
-                >
-                  Pay Now
-                </button>
-
-                <div className="text-center mt-3">
-                  <span className="text-xs text-gray-400">
-                    You choose how to pay on the next step
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mt-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Ordered Items ({orderItems.length})
-        </h2>
-        <div className="space-y-4">
-          {orderItems.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between p-5 border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex gap-5 items-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        `https://placehold.co/200x200/e2e8f0/64748b?text=${encodeURIComponent(
-                          item.name,
-                        )}`;
-                    }}
-                  />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-gray-900">
-                    {item.name}
-                  </h3>
-                  <p className="text-gray-500 text-sm mt-0.5">{item.variant}</p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2.5 py-1 rounded-md">
-                      Qty: {item.quantity}
-                    </span>
-                    <span
-                      className={`text-xs font-semibold ${
-                        item.stock === "In stock"
-                          ? "text-emerald-600"
-                          : "text-amber-600"
-                      }`}
-                    >
-                      {item.stock}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <p className="text-lg font-bold text-gray-900">
-                  ${(item.price * item.quantity).toFixed(2)}
-                </p>
-                {item.quantity > 1 && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    ${item.price.toFixed(2)} each
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 mt-7">Payment Method</h2>
-        <div className="mt-5 space-y-6">
-          {paymentMethods.map((method) => {
-            const selected = paymentMethod === method.name;
-            return (
-              <div
-                onClick={() => setPaymentMethod(method.name)}
-                key={method.id}
-                className={`border border-gray-300 rounded-lg py-7 px-5 ${selected ? "border-primary" : ""}`}
-              >
-                <div className="flex gap-5 items-center">
-                  <input
-                    type="radio"
-                    className="w-4 h-4"
-                    checked={selected}
-                    onChange={() => setPaymentMethod(method.name)}
-                  />
-                  <div>
-                    <p className="font-bold">{method.name}</p>
-                    <p className="text-sm text-gray-400 font-bold">
-                      {method.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Checkout;
+          <span>{currency.format(item.itemTotal)}</span>
+        </div>)}
+        <p className="flex justify-between gap-3 border-t border-border pt-3 font-semibold">Items subtotal <span>{currency.format(cart.totalAmount)}</span></p>
+        <TestPayment cart={cart} addresses={addresses} buyNow={buyNow} onlineAvailable={
+          import.meta.env.VITE_RAZORPAY_TEST_CHECKOUT === "true" ||
+          (import.meta.env.DEV && import.meta.env.VITE_RAZORPAY_TEST_CHECKOUT !== "false")
+        } />
+      </aside>
+    </div>}
+  </section>;
+}

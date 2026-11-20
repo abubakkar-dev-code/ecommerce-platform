@@ -1,195 +1,115 @@
-import { AiOutlineInbox } from "react-icons/ai";
-import { FaBox, FaTruck } from "react-icons/fa";
-import { IoLocationOutline, IoCallOutline } from "react-icons/io5";
-import { MdOutlineCreditCard } from "react-icons/md";
-import { useLocation } from "react-router-dom";
-import Button from "../../componenets/UI/Button";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../redux/store";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import accountService, { type Order } from "../../services/accountService";
+import apiError from "../../services/apiError";
+import OrderStatus from "../../componenets/UI/OrderStatus";
+import CatalogImage from "../../componenets/products/CatalogImage";
 
-const OrderDetails = () => {
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
-  const location = useLocation();
-  const { order } = location.state;
+function OrderContent({ id }: { id: string }) {
+  const [order, setOrder] = useState<Order>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const pending = useRef(false);
 
-  return (
-    <div className="max-w-7xl mx-auto">
-      <div>
-        <div className=" px-6 py-10 mt-10  border border-gray-200 rounded-lg">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold">-My Orders</h3>
-            <p className="text-muted font-semibold leading-1">Order Details</p>
-          </div>
-          <hr className="border border-gray-200 my-5"></hr>
-          <div>
-            <div className="flex justify-between ">
-              <div>
-                <h2 className="text-lg font-bold">Order: # {order.orderId}</h2>
-                <p className="text-muted font-bold text-sm">
-                  placed on: {order.placedOn}
-                </p>
-              </div>
-              <div>
-                <p
-                  className={`font-semibold text-xs px-1 py-1 rounded-md bg-gray-300 ${
-                    order.status === "delivered" ||
-                    order.status === "shipped" ||
-                    order.status === "out_for_delivery"
-                      ? "text-green-600 bg-green-100"
-                      : order.status === "processing"
-                        ? " text-blue-600 bg-blue-100"
-                        : " text-red-600 bg-red-100"
-                  }`}
-                >
-                  {order.status}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5">
-              <div className="border border-gray-200 px-3 py-8 bg-gray-100 rounded-lg flex gap-6 items-center">
-                <div className="bg-blue-100 p-4 rounded-lg">
-                  <FaTruck className="text-2xl text-blue-600" />
-                </div>
-                <div>
-                  <h2 className="font-bold">your Package is on its way!</h2>
-                  <p className="font-bold text-sm text-muted">
-                    Your delivery partner is bringing your order.
-                  </p>
-                </div>
-              </div>
-            </div>
-            {/* Tracking section */}
-            <div className="border border-gray-300 h-40 rounded-md mt-10">
-              <h1>Delivery Progress</h1>
-            </div>
-            {/* order and Address Details */}
-            <div className="border border-gray-300 mt-10 flex px-8 py-5 gap-5">
-              <div className="w-[70%] border py-4 px-6 border-gray-300 rounded-lg">
-                <div className="flex gap-3 items-center">
-                  <AiOutlineInbox className="text-3xl text-blue-600 bg-blue-200 p-1 rounded-lg" />
-                  <h1>Order Items</h1>
-                </div>
-                <div className="mt-6">
-                  <div className="w-full rounded-lg h-50 bg-gray-200">
-                    <img src="" alt={order.product.name} />
-                  </div>
-                  <div className="mt-6 flex flex-col gap-3">
-                    <p className="text-xl font-bold">{order.product.name}</p>
-                    <p className="text-muted text-sm font-bold">
-                      Quantity :
-                      <span className="font-bold text-black">
-                        {" "}
-                        {order.product.quantity}
-                      </span>
-                    </p>
-                    <p className="text-lg font-bold flex justify-end w-full text-blue-600">
-                      ${order.product.price}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="w-[30%] border border-gray-300 p-5 rounded-lg flex flex-col justify-between bg-white">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-                    <div className="flex gap-2.5 items-center">
-                      <IoLocationOutline className="text-3xl text-blue-600 bg-blue-100 p-1.5 rounded-lg" />
-                      <h1 className="font-bold text-gray-800">Deliver to</h1>
-                    </div>
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      Home
-                    </span>
-                  </div>
+  const awaitingPayment = order?.orderStatus === "pending" && order.paymentStatus === "pending";
 
-                  <div className="mt-8 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-sm shrink-0">
-                      {order?.address?.customerName
-                        ? order.address.customerName.charAt(0).toUpperCase()
-                        : "U"}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-sm">
-                        {order.address.customerName}
-                      </p>
-                      <p className="text-xs text-muted font-semibold flex items-center gap-1 mt-0.5">
-                        <IoCallOutline className="text-blue-500" /> +91 98765
-                        43210
-                      </p>
-                    </div>
-                  </div>
+  useEffect(() => {
+    const request = new AbortController();
+    accountService.getOrder(id, request.signal).then(
+      (data) => {
+        if (!request.signal.aborted) {
+          setOrder(data);
+          setError("");
+          if (awaitingPayment && data.paymentStatus === "paid") window.dispatchEvent(new Event("cart-updated"));
+        }
+      },
+      (failure: unknown) => { if (!request.signal.aborted) setError(apiError(failure, "Could not load this order.")); },
+    );
+    return () => request.abort();
+  }, [id, refresh, awaitingPayment]);
 
-                  <div className="mt-12 p-3.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
-                    <p className="text-gray-800 font-semibold text-sm">
-                      {order.address.street}
-                    </p>
-                    <p className="text-gray-600 text-xs font-medium">
-                      {order.address.city}, {order.address.state} -{" "}
-                      <span className="font-bold text-gray-800">
-                        {order.address.postalCode}
-                      </span>
-                    </p>
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                      {order.address.country}
-                    </p>
-                  </div>
-                </div>
+  useEffect(() => {
+    if (!awaitingPayment) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") setRefresh((value) => value + 1); }, 10000);
+    return () => window.clearInterval(timer);
+  }, [awaitingPayment]);
 
-                <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between text-xs text-muted font-semibold">
-                  <span>Shipping Type</span>
-                  <span className="text-gray-800 font-bold">
-                    Standard Delivery
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="border border-gray-300 mt-10  px-3 py-5 gap-5 rounded-lg">
-              <div className="flex gap-5 items-center">
-                <p className="bg-blue-100 p-1 rounded-lg">
-                  <MdOutlineCreditCard className="text-2xl text-blue-600" />
-                </p>
-                <h1 className="text-lg font-bold">Payment Summary</h1>
-              </div>
-              <div className="mt-10 flex flex-col gap-3">
-                <div className="flex justify-between">
-                  <p>Subtotal</p>
-                  <p className="text-gray-800 font-bold">$19000.00</p>
-                </div>
-                <div className="flex justify-between">
-                  <p>Shipping</p>
-                  <p className="text-green-600 font-bold">Free</p>
-                </div>
-                <hr className="border border-gray-300 my-1.5"></hr>
-                <div className="flex flex-col gap-5">
-                  <div className="flex justify-between">
-                    <p className="font-semibold">Total Amount</p>
-                    <p className="text-xl font-bold">$19000.00</p>
-                  </div>
-                  <p className="text-xs font-bold text-muted">
-                    Payment method: {order.paymentMethod}
-                  </p>
-                  <div className="flex justify-between">
-                    <p className="text-xs font-bold text-muted">
-                      Payment status
-                    </p>
-                    <p className="bg-green-300 text-xs py-1 px-2 text-muted font-bold rounded-lg">
-                      paid
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="border border-gray-50">
-              <div className="flex justify-between mt-10">
-                <button className="border border-gray-300 px-4 py-2 rounded-lg">
-                  Download Invoice
-                </button>
-                <Button>Buy Again</Button>
-              </div>
+  const cancel = async () => {
+    if (pending.current || !window.confirm("Cancel this order?")) return;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await accountService.cancelOrder(id);
+      setRefresh((value) => value + 1);
+      setOrder(undefined);
+    } catch (failure) {
+      setError(apiError(failure, "Could not cancel this order."));
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+
+  if (!order) return error ? <p role="alert">{error}</p> : <p role="status">Loading order...</p>;
+  const address = order.shippingAddress;
+  const canCancel = order.paymentStatus !== "paid" && ["pending", "confirmed", "processing"].includes(order.orderStatus);
+
+  return <>
+    <h1 className="store-title">{order.orderStatus === "confirmed" && (order.paymentStatus === "paid" || order.paymentMethod === "cod") ? "Order placed successfully" : "Order details"}</h1>
+    <p className="break-all text-sm text-muted">Order ID {order._id}</p>
+    <p className="text-sm text-muted">{new Date(order.createdAt).toLocaleDateString("en-IN")}</p>
+    <div className="flex flex-wrap gap-2"><OrderStatus status={order.orderStatus} label="Order" /><OrderStatus status={order.paymentStatus} label="Payment" /></div>
+    {order.paymentMethod === "cod" && <p className="text-sm text-muted">Cash on Delivery{order.paymentStatus === "pending" && order.orderStatus !== "cancelled" ? " · Payment due on delivery" : ""}</p>}
+    {error && <p role="alert" className="text-error">{error}</p>}
+    <div className="grid items-start gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <section className="store-panel space-y-4">
+        <h2 className="font-bold">Items</h2>
+        {order.items.map((item) => <div key={item._id} className="flex flex-wrap justify-between gap-3 border-t border-border pt-3">
+          <div className="flex min-w-0 gap-3">
+            {item.image && <CatalogImage src={item.image} alt="" className="size-14 shrink-0 rounded-lg bg-surface object-contain" />}
+            <div className="min-w-0 break-words">
+            <p className="font-medium">{item.productName ?? item.product?.name ?? "Unavailable product"}</p>
+            <p className="text-sm text-muted">{item.sku ?? item.varient?.sku} · Quantity {item.quantity}</p>
+            {Object.entries(item.attributes ?? item.varient?.attributes ?? {}).length > 0 && <p className="text-sm text-muted">
+              {Object.entries(item.attributes ?? item.varient?.attributes ?? {}).map(([label, value]) => `${label} ${value}`).join(" · ")}
+            </p>}
             </div>
           </div>
-        </div>
-      </div>
+          <p className="text-sm">{currency.format(item.price)} each</p>
+        </div>)}
+      </section>
+      <section className="store-panel space-y-4">
+        <h2 className="font-bold">Shipping address</h2>
+        <address className="break-words text-sm not-italic text-muted">
+          {address.fullName}<br />{address.addressLine1}{address.addressLine2 && <><br />{address.addressLine2}</>}<br />
+          {address.city}, {address.state} {address.pincode}<br />{address.country}
+        </address>
+        <dl className="grid grid-cols-2 gap-2 text-sm">
+          <dt>Subtotal</dt><dd className="text-right">{currency.format(order.subtotal)}</dd>
+          <dt>Shipping</dt><dd className="text-right">{currency.format(order.shippingCharge)}</dd>
+          <dt className="font-bold">{order.paymentStatus === "paid" ? "Total paid" : order.paymentMethod === "cod" && order.orderStatus !== "cancelled" ? "Due on delivery" : "Order total"}</dt><dd className="text-right font-bold">{currency.format(order.totalAmount)}</dd>
+        </dl>
+      </section>
     </div>
-  );
-};
+    <nav aria-label="Order actions" className="flex flex-wrap gap-4 text-sm font-semibold text-primary">
+      <Link to="/orders">My Orders</Link><Link to="/products">Continue Shopping</Link>
+    </nav>
+    {canCancel && <button type="button" disabled={busy} onClick={() => void cancel()}
+      className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-error disabled:opacity-50">
+      {busy ? "Cancelling..." : "Cancel order"}
+    </button>}
+  </>;
+}
 
-export default OrderDetails;
+export default function OrderDetails() {
+  const { orderId } = useParams();
+  return <section className="store-page space-y-5">
+    <Link to="/orders" className="text-sm font-semibold text-primary hover:underline">Back to orders</Link>
+    {orderId && /^[a-f\d]{24}$/i.test(orderId)
+      ? <OrderContent key={orderId} id={orderId} /> : <h1 className="store-title">Order not found</h1>}
+  </section>;
+}

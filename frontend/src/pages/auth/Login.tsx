@@ -1,13 +1,32 @@
+import PasswordInput from "../../componenets/UI/PasswordInput";
 import { useState } from "react";
 import authService from "../../services/authService";
 import toast from "react-hot-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { setUsers } from "../../redux/slices/authSlice";
+import { isAxiosError } from "axios";
+import { setCredentials } from "../../redux/slices/authSlice";
+
+interface LoginResponse {
+  data?: {
+    user?: {
+      _id?: string;
+      id?: string;
+      name: string;
+      email: string;
+      role: string;
+    };
+  };
+}
+
+interface LoginErrorResponse {
+  message?: string;
+}
 
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState("");
   const [formData, setFormData] = useState({
@@ -25,63 +44,81 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Button clicked");
     setLoading(true);
+    setErrors("");
     try {
-      const response = await authService.login(formData);
-      if (response) {
-        toast.success("Login successfull");
-        dispatch(setUsers(response.data));
-        navigate("/");
+      const response: LoginResponse = await authService.login(formData);
+      const { user } = response.data ?? {};
+      if (!user) {
+        throw new Error("The login response was incomplete. Please try again.");
       }
+
+      dispatch(setCredentials({ user }));
+      toast.success("Login successful");
+      const from = location.state?.from;
+      navigate(typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && !from.startsWith("/auth") ? from : "/", { replace: true });
     } catch (error) {
-      toast.error("login failed");
-      setErrors(error?.response?.data?.message);
+      const message = isAxiosError<LoginErrorResponse>(error)
+        ? (error.response?.data?.message ?? "Login failed. Please try again.")
+        : error instanceof Error
+          ? error.message
+          : "Login failed. Please try again.";
+      toast.error(message);
+      setErrors(message);
     } finally {
       setLoading(false);
     }
   };
-  
 
   return (
-    <div className="flex justify-center items-center h-screen">
-      <div className="bg-background shadow-lg px-10 py-10  rounded-xl w-[30%]">
-        <div className="text-center mb-3">
-          <h1 className="text-2xl font-bold">Welcome Back</h1>
-          <p className="text-muted font-bold mt-2 text-medium">
-            Login to your account
+    <div className="grid place-items-center px-1 py-6">
+      <div className="store-panel w-full max-w-md">
+        <div className="mb-3">
+          <h1 className="text-2xl font-bold">Sign in</h1>
+          <p className="mt-2 text-sm text-muted">
+            Access your account and orders.
           </p>
         </div>
-        <div className="mt-10">
+        <div className="mt-7">
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col">
-              <label className="mb-2 font-bold text-sm">Email</label>
+              <label htmlFor="email" className="mb-2 font-bold text-sm">
+                Email
+              </label>
               <input
+                id="email"
                 name="email"
-                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
+                className="store-input"
                 type="email"
+                autoComplete="email"
+                required
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="Enter your email address"
               />
             </div>
             <div className="flex flex-col mt-5">
-              <label className="mb-2 font-bold text-sm">Password</label>
-              <input
-                className="py-3 px-4 border border-gray-300 focus:outline-blue-800 rounded-md placeholder:text-muted placeholder:font-semibold"
-                type="password"
+              <label htmlFor="password" className="mb-2 font-bold text-sm">
+                Password
+              </label>
+              <PasswordInput
+                id="password"
+                className="store-input"
+
                 name="password"
+                autoComplete="current-password"
+                required
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
               />
             </div>
-            <p className="text-red-600 text-semibold text-sm mt-2">{errors}</p>
+            <p role="alert" className="text-red-600 text-semibold text-sm mt-2">{errors}</p>
             <div className="mt-5 flex flex-col gap-5">
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-primary py-2 rounded-lg text-white font-bold"
+                className="store-button w-full"
               >
                 {loading ? (
                   <>
@@ -93,20 +130,9 @@ const Login = () => {
                   "Login"
                 )}
               </button>
-              <button
-                type="button"
-                className="border border-gray-400 py-2 rounded-lg font-bold"
-                onClick={() =>
-                  toast.custom(
-                    <div className="border-2 border-yellow-500 bg-yellow-100 text-yellow-700 p-4 rounded">
-                      The Future is coming soon
-                    </div>,
-                  )
-                }
-              >
-                Continue with Google
-              </button>
+
             </div>
+            {import.meta.env.VITE_GOOGLE_OAUTH_ENABLED === "true" && <a className="mt-5 block rounded-lg border border-border p-2 text-center font-semibold" href={`${(import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "")}/users/google`}>Continue with Google</a>}
             <div className="mt-5 text-center">
               <p className="mb-2 text-muted font-bold text-sm">
                 Don't have an account?
@@ -117,7 +143,7 @@ const Login = () => {
               <p className="mt-2 text-muted font-bold text-sm">
                 Forgot your password?
                 <span className="text-primary font-bold text-sm ml-2">
-                  Reset Password
+                  <Link to="/auth/forgot-password">Reset password</Link>
                 </span>
               </p>
             </div>

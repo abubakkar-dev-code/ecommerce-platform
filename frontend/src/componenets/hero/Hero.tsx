@@ -1,41 +1,29 @@
-import Button from "../UI/Button";
 import { Link } from "react-router-dom";
+import { FiArrowUpRight } from "react-icons/fi";
+import type { Product } from "../../redux/slices/productSlice";
+import CatalogImage from "../products/CatalogImage";
 
-const Hero = () => {
-  return (
-    <div className="w-full bg-linear-to-r from-blue-50 to-indigo-50/60 rounded-3xl flex flex-col md:flex-row items-center overflow-hidden border border-blue-100/80 shadow-sm">
-      <div className="flex-1 p-8 sm:p-12 lg:p-16">
-        <span className="inline-block font-extrabold text-primary text-xs uppercase tracking-wider bg-blue-100/70 px-3 py-1 rounded-full mb-3">
-          NEW ARRIVALS
-        </span>
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight mt-2">
-          Upgrade Your Tech Lifestyle
-        </h1>
-        <p className="text-gray-600 font-normal mt-4 text-base max-w-lg leading-relaxed">
-          Discover the latest gadgets, high-performance laptops, smartphones and
-          premium audio at unbeatable prices.
-        </p>
-        <div className="mt-8">
-          <Link to="/products">
-            <Button>Shop Now &rarr;</Button>
-          </Link>
-        </div>
+export default function Hero({ featured }: { featured?: Product }) {
+  const image = featured?.images?.[0];
+  const source = image?.primaryImage || image?.thumbnails?.[0]?.url;
+  return <section className="overflow-hidden rounded-[2rem] bg-[#211732] text-white">
+    <div className="grid items-center gap-5 p-6 sm:p-10 md:grid-cols-[1.1fr_1fr] lg:gap-14 lg:p-14">
+      <div className="py-3">
+        <h1 className="max-w-xl text-4xl leading-[1.03] font-extrabold tracking-tight sm:text-5xl lg:text-6xl">Find your next tech upgrade</h1>
+        <p className="mt-5 max-w-sm text-pretty text-base leading-relaxed text-violet-100">Explore the catalog, compare variants, and find the right fit.</p>
+        <Link to="/products" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-xl bg-[#d8ccff] px-5 py-3 text-sm font-bold text-[#211732] hover:bg-white">
+          Shop the catalog <FiArrowUpRight aria-hidden="true" />
+        </Link>
       </div>
-      <div className="flex-1 p-6 sm:p-10 flex items-center justify-center w-full">
-        <div className="w-full max-w-md aspect-4/3 rounded-2xl bg-white/80 backdrop-blur-sm border border-blue-100 shadow-md p-6 flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center text-3xl mb-4">
-            ⚡
-          </div>
-          <h3 className="text-lg font-bold text-gray-900">
-            Exclusive Tech Deals
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Up to 40% off on premium flagship devices
-          </p>
+      {featured && source ? <Link to={`/products/${featured._id}`}
+        className="group grid min-w-0 overflow-hidden rounded-3xl border border-white/15 bg-[#332449]">
+        <CatalogImage eager src={source} alt={featured.name} className="aspect-[4/3] w-full bg-white object-contain p-5 sm:p-8" />
+        <div className="flex items-center justify-between gap-4 px-5 py-4 text-sm font-semibold">
+          <span className="min-w-0 break-words">{featured.name}</span><FiArrowUpRight className="shrink-0" aria-hidden="true" />
         </div>
-      </div>
+      </Link> : <Link to="/products?sort=newest" className="flex aspect-[4/3] min-h-24 items-center justify-between gap-4 rounded-3xl border border-white/15 bg-[#332449] p-6 font-semibold">
+        Browse new arrivals <FiArrowUpRight aria-hidden="true" />
+      </Link>}
     </div>
-  );
-};
-
-export default Hero;
+  </section>;
+}
