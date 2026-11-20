@@ -7,10 +7,10 @@ exports.deleteBrand = exports.updateBrand = exports.getBrandById = exports.getBr
 const api_error_1 = __importDefault(require("../utils/api-error"));
 const brand_model_1 = __importDefault(require("../models/brand.model"));
 const api_response_1 = __importDefault(require("../utils/api-response"));
+const catalog_validation_1 = require("../validation/catalog.validation");
 const createBrand = async (req, res, next) => {
     try {
-        const { name, slug, description, logo } = req.body;
-        console.log(req.body);
+        const { name, slug, description, logo, isActive } = (0, catalog_validation_1.parse)(catalog_validation_1.brandCreate, req.body);
         if (!name || !slug) {
             throw new api_error_1.default(400, "name and slug are required");
         }
@@ -23,47 +23,52 @@ const createBrand = async (req, res, next) => {
             slug,
             description,
             logo,
+            isActive,
         });
         res.status(201).json(new api_response_1.default("Brand created successfully", brand));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.createBrand = createBrand;
-const getBrands = async (_req, res, next) => {
+const getBrands = async (req, res, next) => {
     try {
-        const brands = await brand_model_1.default.find();
+        const query = (0, catalog_validation_1.parse)(catalog_validation_1.pageQuery, req.query);
+        const [brands, totalProducts] = await Promise.all([
+            brand_model_1.default.find({ isActive: true }).sort({ name: 1, _id: 1 }).skip((query.page - 1) * query.limit).limit(query.limit),
+            brand_model_1.default.countDocuments({ isActive: true }),
+        ]);
         if (!brands) {
             throw new api_error_1.default(404, "No brands found for this category");
         }
         res
             .status(200)
-            .json(new api_response_1.default("Brands details fetched successfully", brands));
+            .json(new api_response_1.default("Brands details fetched successfully", brands, { currentPage: query.page, totalPages: Math.ceil(totalProducts / query.limit), itemsPerPage: query.limit, totalProducts }));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.getBrands = getBrands;
 const getBrandById = async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const id = (0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id);
         const brand = await brand_model_1.default.findById(id);
-        if (!brand) {
+        if (!brand || !brand.isActive) {
             throw new api_error_1.default(404, "Brand not found");
         }
         res.status(200).json(new api_response_1.default("Brand fetched successfully", brand));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.getBrandById = getBrandById;
 const updateBrand = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const { name, slug, description, logo, isActive } = req.body;
+        const id = (0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id);
+        const { name, slug, description, logo, isActive } = (0, catalog_validation_1.parse)(catalog_validation_1.brandUpdate, req.body);
         const brand = await brand_model_1.default.findById(id);
         if (!brand) {
             throw new api_error_1.default(404, "Brand not found");
@@ -86,13 +91,13 @@ const updateBrand = async (req, res, next) => {
         res.status(200).json(new api_response_1.default("Brand updated successfully", brand));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.updateBrand = updateBrand;
 const deleteBrand = async (req, res, next) => {
     try {
-        const { id } = req.params;
+        const id = (0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id);
         const brand = await brand_model_1.default.findById(id);
         if (!brand) {
             throw new api_error_1.default(404, "Brand not found");
@@ -107,7 +112,7 @@ const deleteBrand = async (req, res, next) => {
             .json(new api_response_1.default("Brand deactivated successfully", brand));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.deleteBrand = deleteBrand;

@@ -42,5 +42,6 @@ const categorySchema = new Schema<IProduct>(
     timestamps: true,
   },
 );
+categorySchema.index({ parentCategory: 1, isActive: 1, name: 1 });
 const Category = mongoose.model<IProduct>("Category", categorySchema);
 export default Category;

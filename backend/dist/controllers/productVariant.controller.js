@@ -4,134 +4,96 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteVarient = exports.updatevarient = exports.getVrientById = exports.getVarient = exports.createProductVariant = void 0;
-const api_error_1 = __importDefault(require("../utils/api-error"));
 const product_model_1 = __importDefault(require("../models/product.model"));
 const productVariant_model_1 = __importDefault(require("../models/productVariant.model"));
+const api_error_1 = __importDefault(require("../utils/api-error"));
 const api_response_1 = __importDefault(require("../utils/api-response"));
+const catalog_service_1 = require("../services/catalog.service");
+const catalog_validation_1 = require("../validation/catalog.validation");
+const activeProduct = async (id) => {
+    const product = await product_model_1.default.findById(id);
+    if (!product || !product.isActive)
+        throw new api_error_1.default(404, "Product not found");
+    await (0, catalog_service_1.requireActiveParents)(String(product.category), String(product.brand));
+    return product;
+};
 const createProductVariant = async (req, res, next) => {
     try {
-        const { product, sku, attributes, price, comparedAt } = req.body;
-        if (!product || !sku || !attributes) {
-            throw new api_error_1.default(400, "name,attributes and sku are required fields");
-        }
-        const existingProduct = await product_model_1.default.findById(product);
-        if (!existingProduct) {
-            throw new api_error_1.default(400, "The product is not found");
-        }
-        if (!existingProduct.isActive) {
-            throw new api_error_1.default(400, "can't able to create the variant for deactivated product");
-        }
-        const existingSKU = await productVariant_model_1.default.findOne({ sku });
-        if (existingSKU) {
-            throw new api_error_1.default(400, "sku must be unique");
-        }
-        if (price < 0) {
-            throw new api_error_1.default(400, "price must be greater than 0");
-        }
-        if (comparedAt !== undefined && comparedAt < price) {
-            throw new api_error_1.default(400, "compared-At price can't lesser than selling price");
-        }
-        const productVariant = await productVariant_model_1.default.create({
-            product,
-            sku,
-            attributes,
-            price,
-            comparedAt,
-        });
-        res
-            .status(201)
-            .json(new api_response_1.default("Product variant created successfully", productVariant));
+        const body = (0, catalog_validation_1.parse)(catalog_validation_1.variantCreate, req.body);
+        await activeProduct(body.product);
+        const variant = await productVariant_model_1.default.create(body);
+        res.status(201).json(new api_response_1.default("Product variant created successfully", variant));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.createProductVariant = createProductVariant;
 const getVarient = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const product = await product_model_1.default.findById(id);
-        if (!product) {
-            throw new api_error_1.default(404, "Product not found");
-        }
-        const varients = await productVariant_model_1.default.find({
-            product: product._id
-        }).where({ isActive: true });
-        if (varients.length === 0) {
-            throw new api_error_1.default(404, "No varients found for this product");
-        }
-        res
-            .status(200)
-            .json(new api_response_1.default("Product varients fetched successfully", varients));
+        const id = (0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id);
+        const query = (0, catalog_validation_1.parse)(catalog_validation_1.pageQuery, req.query);
+        await activeProduct(id);
+        const filter = { product: id, isActive: true };
+        const [variants, totalProducts] = await Promise.all([
+            productVariant_model_1.default.find(filter).sort({ _id: 1 }).skip((query.page - 1) * query.limit).limit(query.limit),
+            productVariant_model_1.default.countDocuments(filter),
+        ]);
+        res.status(200).json(new api_response_1.default("Product varients fetched successfully", variants, {
+            currentPage: query.page, totalPages: Math.ceil(totalProducts / query.limit), itemsPerPage: query.limit, totalProducts,
+        }));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.getVarient = getVarient;
 const getVrientById = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const varient = await productVariant_model_1.default.findById(id);
-        if (!varient) {
+        const variant = await productVariant_model_1.default.findById((0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id));
+        if (!variant || !variant.isActive)
             throw new api_error_1.default(404, "sorry varient not available");
-        }
-        res
-            .status(200)
-            .json(new api_response_1.default("single varient fetched sucessfully", varient));
+        await activeProduct(String(variant.product));
+        res.status(200).json(new api_response_1.default("single varient fetched sucessfully", variant));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.getVrientById = getVrientById;
 const updatevarient = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const { attributes, price, comparedAt, isActive } = req.body;
-        if (!attributes && !price && !isActive) {
-            throw new api_error_1.default(400, "please enter the required fields");
-        }
-        const exisitngVarient = await productVariant_model_1.default.findById(id);
-        if (!exisitngVarient) {
+        const id = (0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id);
+        const body = (0, catalog_validation_1.parse)(catalog_validation_1.variantUpdate, req.body);
+        const variant = await productVariant_model_1.default.findById(id);
+        if (!variant)
             throw new api_error_1.default(404, "varient doesn't exist");
-        }
-        if (price !== undefined && price <= 0) {
-            throw new api_error_1.default(400, "Price must be greater than 0");
-        }
-        if (comparedAt !== undefined && comparedAt < price) {
-            throw new api_error_1.default(400, "comparedAt price should be greater than price value");
-        }
-        exisitngVarient.attributes = attributes ?? exisitngVarient.attributes;
-        exisitngVarient.price = price ?? exisitngVarient.price;
-        exisitngVarient.comparedAt = comparedAt ?? exisitngVarient.comparedAt;
-        exisitngVarient.isActive = isActive ?? exisitngVarient.isActive;
-        await exisitngVarient.save();
-        res
-            .status(201)
-            .json(new api_response_1.default("varient updated successfully", exisitngVarient));
+        if (body.isActive ?? variant.isActive)
+            await activeProduct(String(variant.product));
+        const price = body.price ?? variant.price;
+        const comparedAt = body.comparedAt ?? variant.comparedAt;
+        if (comparedAt != null && comparedAt < price)
+            throw new api_error_1.default(400, "Compared-at price cannot be below price");
+        Object.assign(variant, body);
+        await variant.save();
+        res.status(201).json(new api_response_1.default("varient updated successfully", variant));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.updatevarient = updatevarient;
 const deleteVarient = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const varient = await productVariant_model_1.default.findById(id);
-        if (!varient) {
+        const variant = await productVariant_model_1.default.findById((0, catalog_validation_1.parse)(catalog_validation_1.objectId, req.params.id));
+        if (!variant)
             throw new api_error_1.default(404, "varient not found");
-        }
-        if (!varient.isActive) {
-            throw new api_error_1.default(400, "varient is already in deactivated state");
-        }
-        varient.isActive = false;
-        await varient.save();
-        res.status(200).json(new api_response_1.default("product deactivated successfully", varient));
+        variant.isActive = false;
+        await variant.save();
+        res.status(200).json(new api_response_1.default("product deactivated successfully", variant));
     }
     catch (error) {
-        next(error);
+        next((0, catalog_validation_1.catalogError)(error));
     }
 };
 exports.deleteVarient = deleteVarient;

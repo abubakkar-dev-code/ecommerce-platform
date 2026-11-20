@@ -47,6 +47,13 @@ const wishlistSchema = new mongoose_1.Schema({
             default: [],
         },
     ],
+    variants: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: "Varient",
+            default: [],
+        },
+    ],
 });
 const WishList = mongoose_1.default.model("WishList", wishlistSchema);
 exports.default = WishList;

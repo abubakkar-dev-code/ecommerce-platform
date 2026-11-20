@@ -15,7 +15,7 @@ export const authorize = (requiredRole: "customer" | "admin") => {
         throw new ApiError(404, "User not found");
       }
       if (user.role !== requiredRole) {
-        throw new ApiError(401, "Access Restricted");
+        throw new ApiError(403, "Access Restricted");
       }
       next();
     } catch (error) {

@@ -133,6 +133,8 @@ const orderSchema = new mongoose_1.Schema({
             "shipped",
             "delivered",
             "cancelled",
+            "expired",
+            "payment_review",
         ],
         default: "pending",
     },

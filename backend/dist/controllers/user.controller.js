@@ -13,6 +13,8 @@ const authToken_1 = __importDefault(require("../models/authToken"));
 const sendmail_1 = require("../services/sendmail");
 const resetTokenGeneration_1 = require("../config/resetTokenGeneration");
 const resetTokenHash_1 = require("../config/resetTokenHash");
+const user_dto_1 = require("../dto/user.dto");
+const browser_auth_1 = require("../config/browser-auth");
 const registerUser = async (req, res, next) => {
     try {
         const { name, email, password } = req.body;
@@ -29,7 +31,7 @@ const registerUser = async (req, res, next) => {
             email,
             password: hashedPassword,
         });
-        res.status(201).json(new api_response_1.default("user registered successfully", user));
+        res.status(201).json(new api_response_1.default("user registered successfully", (0, user_dto_1.toUserDto)(user)));
     }
     catch (error) {
         next(error);
@@ -42,18 +44,28 @@ const loginUser = async (req, res, next) => {
         if (!email || !password) {
             throw new api_error_1.default(400, "name and email are required");
         }
-        const user = await user_model_1.default.findOne({ email });
+        const user = await user_model_1.default.findOne({ email }).select("+password");
         if (!user) {
             throw new api_error_1.default(400, "user not found");
+        }
+        if (user.isActive !== true) {
+            throw new api_error_1.default(403, "Account is disabled");
+        }
+        if (!user.password) {
+            throw new api_error_1.default(401, "Invalid credentials");
         }
         const isPasswordCorrect = await bcryptjs_1.default.compare(password, user.password);
         if (!isPasswordCorrect) {
             throw new api_error_1.default(401, "Invalid credentials");
         }
         const token = (0, jwt_1.generateToken)(user._id.toString());
+        const cookieMode = req.get("X-Auth-Mode") === "cookie";
+        if (cookieMode)
+            res.cookie(browser_auth_1.authCookieName, token, browser_auth_1.authCookieOptions);
+        res.setHeader("Cache-Control", "no-store");
         res.status(200).json(new api_response_1.default("Login successfull", {
-            user,
-            token,
+            user: (0, user_dto_1.toUserDto)(user),
+            ...(cookieMode ? {} : { token }),
         }));
     }
     catch (error) {
@@ -64,11 +76,11 @@ exports.loginUser = loginUser;
 const userProfile = async (req, res, next) => {
     try {
         const userId = req.user.userId;
-        const user = await user_model_1.default.findById(userId).select("-password");
+        const user = await user_model_1.default.findById(userId);
         if (!user) {
             throw new api_error_1.default(404, "user not found");
         }
-        res.status(200).json(new api_response_1.default("Profile fetched successfully", user));
+        res.status(200).json(new api_response_1.default("Profile fetched successfully", (0, user_dto_1.toUserDto)(user)));
     }
     catch (error) {
         next(error);
@@ -97,7 +109,7 @@ const updateProfile = async (req, res, next) => {
             user.name = name;
         }
         await user.save();
-        res.status(201).json(new api_response_1.default("profile updated successfully", user));
+        res.status(201).json(new api_response_1.default("profile updated successfully", (0, user_dto_1.toUserDto)(user)));
     }
     catch (error) {
         next(error);
@@ -111,9 +123,12 @@ const updatePassword = async (req, res, next) => {
         if (!currentPassword || !newPassword) {
             throw new api_error_1.default(400, "Current password and new password are required");
         }
-        const user = await user_model_1.default.findById(userId);
+        const user = await user_model_1.default.findById(userId).select("+password");
         if (!user) {
             throw new api_error_1.default(404, "User not found");
+        }
+        if (!user.password) {
+            throw new api_error_1.default(401, "Invalid credentials");
         }
         const isCurrentPasswordCorrect = await bcryptjs_1.default.compare(currentPassword, user.password);
         if (!isCurrentPasswordCorrect) {
@@ -135,14 +150,26 @@ const updatePassword = async (req, res, next) => {
     }
 };
 exports.updatePassword = updatePassword;
-const googleCallback = (req, res) => {
-    const user = req.user;
-    const token = (0, jwt_1.generateToken)(user._id.toString());
-    res.redirect(`http://localhost:5173/google-success?token=${token}`);
-    // res.json({
-    //   message: "Google authentication successful",
-    //   token,
-    // });
+const googleCallback = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            throw new api_error_1.default(401, "Account is unavailable");
+        }
+        // Recheck after Passport: the account may have changed during OAuth.
+        const user = await user_model_1.default.findById(userId);
+        if (!user) {
+            throw new api_error_1.default(401, "Account is unavailable");
+        }
+        if (user.isActive !== true) {
+            throw new api_error_1.default(403, "Account is disabled");
+        }
+        const token = (0, jwt_1.generateToken)(user._id.toString());
+        res.redirect(`http://localhost:5173/google-success?token=${token}`);
+    }
+    catch (error) {
+        next(error);
+    }
 };
 exports.googleCallback = googleCallback;
 const forgotPassword = async (req, res, next) => {
@@ -208,7 +235,7 @@ const resetPassword = async (req, res, next) => {
         const hashedPassword = await bcryptjs_1.default.hash(newPassword, 12);
         user.password = hashedPassword;
         await user.save();
-        res.status(201).json(new api_response_1.default("Password reset successfully", user));
+        res.status(201).json(new api_response_1.default("Password reset successfully", (0, user_dto_1.toUserDto)(user)));
     }
     catch (error) {
         next(error);
@@ -216,6 +243,7 @@ const resetPassword = async (req, res, next) => {
 };
 exports.resetPassword = resetPassword;
 const logout = (_req, res) => {
+    res.clearCookie(browser_auth_1.authCookieName, browser_auth_1.authCookieOptions);
     res.status(200).json(new api_response_1.default("Logout successfull"));
 };
 exports.logout = logout;

@@ -50,13 +50,15 @@ const getwishList = async (req, res, next) => {
         if (!userId) {
             throw new api_error_1.default(400, "Unauthorized,please Login first");
         }
-        const userWishListt = await whistlist_model_1.default.findOne({ user: userId }).populate("products");
-        if (!userWishListt) {
+        const userWishList = await whistlist_model_1.default.findOne({ user: userId })
+            .populate("products")
+            .populate("variants");
+        if (!userWishList) {
             throw new api_error_1.default(400, "WishList is Empty");
         }
         res
             .status(200)
-            .json(new api_response_1.default("WishList fetched successfully", userWishListt));
+            .json(new api_response_1.default("WishList fetched successfully", userWishList));
     }
     catch (error) {
         next(error);

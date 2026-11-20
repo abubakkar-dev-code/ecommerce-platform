@@ -1,259 +1,164 @@
 import { NextFunction, Request, Response } from "express";
-import ApiResponse from "../utils/api-response";
-import ApiError from "../utils/api-error";
-import cloudinary from "../config/cloudinary";
+import { Error as MongooseError } from "mongoose";
+import { z } from "zod";
+import multer from "multer";
 import Product from "../models/product.model";
 import ProductImage from "../models/productImageSchema";
+import ApiError from "../utils/api-error";
+import ApiResponse from "../utils/api-response";
+import { objectId, parse } from "../validation/catalog.validation";
+import { requireActiveParents } from "../services/catalog.service";
+import { validateImage, uploadImage, markAttached, queueCleanup, cleanupImages, type UploadedImage } from "../services/image.service";
 
-export const createImage = async (
-  req: Request<{ productId: string }>,
-  res: Response,
-  next: NextFunction,
-) => {
+const emptyBody = z.object({}).strict();
+const thumbnailBody = z.object({ mode: z.enum(["single", "all"]), publicId: z.string().min(1).max(512).optional() }).strict()
+  .refine((value) => value.mode !== "single" || !!value.publicId);
+const imageError = (error: unknown) => {
+  if (error instanceof ApiError) return error;
+  if (error instanceof MongooseError.VersionError || (typeof error === "object" && error !== null && "code" in error && error.code === 11000)) {
+    return new ApiError(409, "Images changed concurrently; reload and retry");
+  }
+  return new ApiError(500, "Image operation failed");
+};
+export const uploadError = (error: unknown, _req: Request, _res: Response, next: NextFunction) => {
+  if (error instanceof multer.MulterError) {
+    next(new ApiError(error.code === "LIMIT_FILE_SIZE" ? 413 : 400, "Upload limits exceeded or unexpected upload field"));
+  } else next(error);
+};
+const getImageRecord = async (id: unknown) => {
+  const image = await ProductImage.findById(parse(objectId, id));
+  if (!image || !(await Product.exists({ _id: image.product }))) throw new ApiError(404, "Image or product not found");
+  return image;
+};
+const prepare = async (files: Express.Multer.File[]) => {
+  const buffers: Buffer[] = [];
+  for (const file of files) buffers.push(await validateImage(file));
+  return buffers;
+};
+const sendUploads = async (buffers: Buffer[], journal: string[]) => {
+  const uploaded: UploadedImage[] = [];
+  for (const buffer of buffers) uploaded.push(await uploadImage(buffer, journal));
+  return uploaded;
+};
+const abandonUploads = async (ids: string[]) => {
+  // Delay unknown provider outcomes: a timed-out upload may still finish remotely.
+  await queueCleanup(ids, 5 * 60 * 1000);
+};
+
+export const createImage = async (req: Request, res: Response, next: NextFunction) => {
+  const journal: string[] = [];
+  let committed = false;
   try {
-    const { productId } = req.params;
+    const productId = parse(objectId, req.params.productId);
+    parse(emptyBody, req.body ?? {});
+    if (!(await Product.exists({ _id: productId }))) throw new ApiError(404, "product not found");
+    if (await ProductImage.exists({ product: productId })) throw new ApiError(409, "Product already has images");
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const primary = files?.primaryImage?.[0];
+    if (!primary) throw new ApiError(400, "Please upload a primary image");
+    const buffers = await prepare([primary, ...(files?.thumbnails ?? [])]);
+    const [uploadedPrimary, ...thumbnails] = await sendUploads(buffers, journal);
+    const image = await ProductImage.create({ product: productId, primaryImage: uploadedPrimary!.url,
+      primaryPublicId: uploadedPrimary!.publicId, thumbnails });
+    committed = true;
+    await markAttached(journal);
+    res.status(201).json(new ApiResponse("Images uploaded successfully", image));
+  } catch (error) {
+    if (!committed) await abandonUploads(journal);
+    next(imageError(error));
+  }
+};
+
+export const getImages = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const productId = parse(objectId, req.params.productId);
     const product = await Product.findById(productId);
-    if (!product) {
-      throw new ApiError(404, "product not found");
-    }
-    if (!req.files) {
-      throw new ApiError(409, "Please upload an images");
-    }
-    const files = req.files as { [fieldName: string]: Express.Multer.File[] };
-    const primaryImage = files.primaryImage?.[0];
-    const thumbnails = files.thumbnails ?? [];
-
-    if (!primaryImage) {
-      throw new ApiError(409, "Please upload a primary image");
-    }
-    const existingImages = await ProductImage.findById(productId);
-    if (existingImages) {
-      throw new ApiError(409, "Product already has images");
-    }
-    const productImage = await ProductImage.create({
-      product: productId,
-      primaryImage: primaryImage.path,
-      primaryPublicId: primaryImage.filename,
-      thumbnails: thumbnails.map((file) => ({
-        url: file.path,
-        publicId: file.filename,
-      })),
-    });
-    res
-      .status(201)
-      .json(new ApiResponse("Images uploaded successfully", productImage));
-  } catch (error) {
-    next(error);
-  }
+    if (!product || !product.isActive) throw new ApiError(404, "product not found");
+    await requireActiveParents(String(product.category), String(product.brand));
+    const image = await ProductImage.findOne({ product: productId, isActive: true });
+    if (!image) throw new ApiError(404, "images not found");
+    res.status(200).json(new ApiResponse("Images fetched successfully", image));
+  } catch (error) { next(imageError(error)); }
 };
-export const getImages = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+
+export const updatePrimaryImage = async (req: Request, res: Response, next: NextFunction) => {
+  const journal: string[] = [];
+  let committed = false;
   try {
-    const { productId } = req.params;
-    const product = await Product.findById(productId);
-    if (!product) {
-      throw new ApiError(404, "product not found");
-    }
-    const images = await ProductImage.findOne({
-      product: productId,
-      isActive: true,
-    });
-    if (!images) {
-      throw new ApiError(404, "images not found");
-    }
-    res
-      .status(200)
-      .json(new ApiResponse("Images fetched successfully", images));
+    const image = await getImageRecord(req.params.productImageId);
+    parse(emptyBody, req.body ?? {});
+    if (!req.file) throw new ApiError(400, "Please upload an image");
+    const [buffer] = await prepare([req.file]);
+    const uploaded = await uploadImage(buffer!, journal);
+    const old = image.primaryPublicId ? [image.primaryPublicId] : [];
+    await queueCleanup(old, 5 * 60 * 1000, true);
+    image.primaryImage = uploaded.url;
+    image.primaryPublicId = uploaded.publicId;
+    await image.save();
+    committed = true;
+    await markAttached(journal);
+    await cleanupImages(old);
+    res.status(200).json(new ApiResponse("Primary Image updated successfully", image));
   } catch (error) {
-    next(error);
+    if (!committed) await abandonUploads(journal);
+    next(imageError(error));
   }
 };
 
-export const updatePrimaryImage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const updateThumbnails = async (req: Request, res: Response, next: NextFunction) => {
+  const journal: string[] = [];
+  let committed = false;
   try {
-    const { productImageId } = req.params;
-    const existingImage = await ProductImage.findById(productImageId);
-    if (!existingImage) {
-      throw new ApiError(404, "Image not found");
-    }
-    if (!req.file) {
-      throw new ApiError(400, "Please upload an image");
-    }
-    const file = req.file;
-    const oldPrimaryPublicId = existingImage.primaryPublicId;
-    existingImage.primaryImage = file.path;
-    existingImage.primaryPublicId = file.filename;
-    await existingImage.save();
-    if (oldPrimaryPublicId) {
-      await cloudinary.uploader.destroy(oldPrimaryPublicId);
-    }
-    res
-      .status(2001)
-      .json(
-        new ApiResponse("Primary Image updated successfully", existingImage),
-      );
+    const image = await getImageRecord(req.params.productImageId);
+    const { mode, publicId } = parse(thumbnailBody, req.body);
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length || files.length > 5 || (mode === "single" && files.length !== 1)) throw new ApiError(400, "Invalid thumbnail count");
+    const index = image.thumbnails?.findIndex((thumbnail) => thumbnail.publicId === publicId) ?? -1;
+    if (mode === "single" && index === -1) throw new ApiError(404, "Thumbnail not found");
+    const buffers = await prepare(files);
+    const uploads = await sendUploads(buffers, journal);
+    const old = mode === "all" ? (image.thumbnails ?? []).map((thumbnail) => thumbnail.publicId)
+      : [image.thumbnails![index]!.publicId];
+    await queueCleanup(old, 5 * 60 * 1000, true);
+    if (mode === "all") image.thumbnails = uploads;
+    else image.thumbnails!.splice(index, 1, uploads[0]!);
+    await image.save();
+    committed = true;
+    await markAttached(journal);
+    await cleanupImages(old);
+    res.status(200).json(new ApiResponse("Thumbnails updated successfully", image));
   } catch (error) {
-    next(error);
-  }
-};
-export const updateThumbnails = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  const uploadedFiles = (req.files as Express.Multer.File[]) ?? [];
-  try {
-    const { productImageId } = req.params;
-    const { mode, publicId } = req.body;
-    const existingImage = await ProductImage.findById(productImageId);
-    if (!existingImage) {
-      throw new ApiError(404, "Images not found ");
-    }
-    if (mode !== "single" && mode !== "all") {
-      throw new ApiError(400, 'Mode must be "single" or "all"');
-    }
-    if (uploadedFiles.length === 0) {
-      throw new ApiError(409, "Please upload an image");
-    }
-    const oldPublicIds: string[] = [];
-    if (mode === "single") {
-      if (!publicId) {
-        throw new ApiError(400, "publicId is must");
-      }
-      if (uploadedFiles.length !== 1) {
-        throw new ApiError(400, "please upload one file");
-      }
-      if (!existingImage.thumbnails || existingImage.thumbnails.length === 0) {
-        throw new ApiError(404, "No thumbnails exist for this product");
-      }
-      const existingThumbnailIndex = existingImage.thumbnails?.findIndex(
-        (file) => file.publicId === publicId,
-      );
-      if (existingThumbnailIndex === -1) {
-        throw new ApiError(404, "Thumbnail not found");
-      }
-      oldPublicIds.push(
-        existingImage.thumbnails[existingThumbnailIndex]?.publicId,
-      );
-      existingImage.thumbnails[existingThumbnailIndex].url =
-        uploadedFiles[0].path;
-      existingImage.thumbnails[existingThumbnailIndex].publicId =
-        uploadedFiles[0].filename;
-      if (mode === "all") {
-        oldPublicIds.push(
-          ...existingImage.thumbnails.map((thumb) => thumb.publicId),
-        );
-        existingImage.thumbnails = uploadedFiles.map((file) => ({
-          url: file.path,
-          publicId: file.filename,
-        }));
-      }
-      await existingImage.save();
-      for (const publicId of oldPublicIds) {
-        const result = await cloudinary.uploader.destroy(publicId, {
-          resource_type: "image",
-        });
-        console.log(result);
-      }
-      res
-        .status(200)
-        .json(
-          new ApiResponse("Thumbnails updated successfully", existingImage),
-        );
-    }
-  } catch (error) {
-    next(error);
+    if (!committed) await abandonUploads(journal);
+    next(imageError(error));
   }
 };
 
-export const deletePrimaryImage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const deletePrimaryImage = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { productImageId } = req.params;
-    const existingImage = await ProductImage.findById(productImageId);
-    if (!existingImage) {
-      throw new ApiError(404, "Primary Image not found ");
-    }
-    if (existingImage.primaryPublicId) {
-      await cloudinary.uploader.destroy(existingImage.primaryPublicId);
-    }
-    existingImage.primaryImage = "";
-    existingImage.primaryPublicId = "";
-    await existingImage.save();
-    res
-      .status(200)
-      .json(new ApiResponse("Primary Image deleted successfully", {}));
-  } catch (error) {
-    next(error);
-  }
+    const image = await getImageRecord(req.params.productImageId);
+    parse(emptyBody, req.body ?? {});
+    const old = image.primaryPublicId ? [image.primaryPublicId] : [];
+    await queueCleanup(old, 5 * 60 * 1000, true);
+    image.primaryImage = "";
+    image.primaryPublicId = "";
+    await image.save();
+    await cleanupImages(old);
+    res.status(200).json(new ApiResponse("Primary Image deleted successfully", {}));
+  } catch (error) { next(imageError(error)); }
 };
-export const deleteThumbnails = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const deleteThumbnails = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { productImageId } = req.params;
-    const { mode, publicId } = req.body;
-    if (mode !== "single" && mode !== "all") {
-      throw new ApiError(400, 'Mode must be "single" or "all"');
-    }
-    const existingImage = await ProductImage.findById(productImageId);
-    if (!existingImage) {
-      throw new ApiError(404, "Image not found");
-    }
-
-    if (mode === "single") {
-      if (!publicId) {
-        throw new ApiError(400, "publicId is must");
-      }
-
-      if (!existingImage.thumbnails || existingImage.thumbnails.length === 0) {
-        throw new ApiError(404, "No thumbnails exist for this product");
-      }
-      const thumbnailindex = existingImage.thumbnails?.findIndex(
-        (thumb) => thumb.publicId === publicId,
-      );
-      if (thumbnailindex === -1) {
-        throw new ApiError(404, "image not found");
-      }
-      await cloudinary.uploader.destroy(
-        existingImage.thumbnails[thumbnailindex].publicId,
-        { resource_type: "image" },
-      );
-      existingImage.thumbnails.splice(thumbnailindex, 1);
-    }
-    let oldPublicids: string[] = [];
-    if (mode === "all") {
-      oldPublicids.push(
-        ...(existingImage.thumbnails?.map((thumb) => thumb.publicId) || []),
-      );
-      if (!existingImage.thumbnails || existingImage.thumbnails.length === 0) {
-        throw new ApiError(404, "No thumbnails exist for this product");
-      }
-      existingImage.thumbnails.splice(0, existingImage.thumbnails.length);
-    }
-    await existingImage.save();
-    for (const publicId of oldPublicids) {
-      const result = await cloudinary.uploader.destroy(publicId, {
-        resource_type: "image",
-      });
-      console.log(result);
-    }
-    res
-      .status(200)
-      .json(new ApiResponse("Thumbnails deleted successfully", existingImage));
-  } catch (error) {
-    next(error);
-  }
+    const image = await getImageRecord(req.params.productImageId);
+    const { mode, publicId } = parse(thumbnailBody, req.body);
+    const index = image.thumbnails?.findIndex((thumbnail) => thumbnail.publicId === publicId) ?? -1;
+    if (mode === "single" && index === -1) throw new ApiError(404, "Thumbnail not found");
+    const old = mode === "all" ? (image.thumbnails ?? []).map((thumbnail) => thumbnail.publicId)
+      : [image.thumbnails![index]!.publicId];
+    await queueCleanup(old, 5 * 60 * 1000, true);
+    if (mode === "all") image.thumbnails = [];
+    else image.thumbnails!.splice(index, 1);
+    await image.save();
+    await cleanupImages(old);
+    res.status(200).json(new ApiResponse("Thumbnails deleted successfully", image));
+  } catch (error) { next(imageError(error)); }
 };

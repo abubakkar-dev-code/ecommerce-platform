@@ -12,6 +12,8 @@ const productVarientSchema = new Schema(
       required: true,
       unique: true,
       uppercase: true,
+      trim: true,
+      maxLength: 80,
     },
     attributes: {
       type: Map,
@@ -36,5 +38,6 @@ const productVarientSchema = new Schema(
     timestamps: true,
   },
 );
+productVarientSchema.index({ product: 1, isActive: 1, price: 1 });
 const Varient = mongoose.model("Varient", productVarientSchema);
 export default Varient;

@@ -46,18 +46,26 @@ const inventorySchema = new mongoose_1.Schema({
         required: true,
         min: 0,
         default: 0,
+        validate: Number.isSafeInteger,
     },
     reservedQuantity: {
         type: Number,
         min: 0,
         default: 0,
+        validate: Number.isSafeInteger,
     },
     lowStockThreshold: {
         type: Number,
         min: 0,
         default: 5,
+        validate: Number.isSafeInteger,
     },
 }, {
     timestamps: true,
 });
+inventorySchema.pre("validate", function () {
+    if (this.reservedQuantity > this.quantity)
+        this.invalidate("reservedQuantity", "Reserved quantity exceeds stock");
+});
+inventorySchema.index({ varient: 1 }, { unique: true });
 exports.Inventory = mongoose_1.default.model("Inventory", inventorySchema);

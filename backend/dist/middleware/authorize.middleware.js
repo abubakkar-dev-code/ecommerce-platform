@@ -15,7 +15,7 @@ const authorize = (requiredRole) => {
                 throw new api_error_1.default(404, "User not found");
             }
             if (user.role !== requiredRole) {
-                throw new api_error_1.default(401, "Access Restricted");
+                throw new api_error_1.default(403, "Access Restricted");
             }
             next();
         }

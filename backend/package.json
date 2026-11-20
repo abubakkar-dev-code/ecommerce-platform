@@ -6,7 +6,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "test:pricing": "npm run build && node --test tests/pricing.test.cjs",
+    "test:catalog": "npm run build && node --test tests/catalog.integration.test.cjs",
+    "test:images": "npm run build && node --test tests/images.integration.test.cjs",
+    "test:inventory": "npm run build && node --test tests/inventory.integration.test.cjs",
+    "test:smoke": "npm run build && node --test tests/baseline.test.cjs",
+    "test:security": "npm run build && node --test tests/management-authorization.test.cjs tests/account-status.test.cjs tests/user-data-security.test.cjs"
   },
   "keywords": [],
   "author": "",
@@ -31,7 +38,7 @@
     "nodemailer": "^10.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "razorpay": "^2.9.8",
+    "sharp": "^0.35.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

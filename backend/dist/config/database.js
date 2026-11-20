@@ -8,6 +8,10 @@ const env_1 = require("./env");
 const connectDb = async () => {
     try {
         await mongoose_1.default.connect(env_1.env.mongodbUri);
+        const topology = await mongoose_1.default.connection.db.admin().command({ hello: 1 });
+        if (!topology.setName && topology.msg !== "isdbgrid") {
+            throw new Error("Inventory and checkout require a replica set or sharded MongoDB deployment");
+        }
         console.log("mongo db connected successfully");
     }
     catch (error) {

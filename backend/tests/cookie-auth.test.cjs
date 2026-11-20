@@ -1,0 +1,67 @@
+const assert = require("node:assert/strict");
+const { once } = require("node:events");
+const { test, mock } = require("node:test");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+for (const key of ["MONGODB_URI", "JWT_SECRET", "CLIENT_ID", "CLIENT_SECRET", "MAIL_HOST", "MAIL_USER", "MAIL_PASSWORD", "MAIL_FROM", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "RAZOR_PAY_KEY", "RAZOR_PAY_SECRET"]) process.env[key] = "cookie-test-only";
+process.env.JWT_EXPIRES_IN = "15m";
+process.env.CLIENT_CALLBACK_URI = "http://localhost:5000/api/users/google/callback";
+process.env.CLIENT_ORIGINS = "http://localhost:5173";
+process.env.MAIL_PORT = "2525";
+process.env.NODE_ENV = "production";
+const User = require("../dist/models/user.model.js").default;
+const user = { _id: "111111111111111111111111", name: "Customer", email: "cookie@example.test", role: "customer", isActive: true, password: bcrypt.hashSync("test-password", 4) };
+mock.method(User, "findOne", () => ({ select: async () => user }));
+mock.method(User, "findById", async () => user);
+const app = require("../dist/app.js").default;
+const { startIsolatedMongo } = require("./helpers/isolated-mongo.cjs");
+
+test("cookie auth login, restore, expiration, CSRF and logout", async () => {
+  const db = await startIsolatedMongo();
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}/api/users`;
+  const headers = { "Content-Type": "application/json", "X-Auth-Mode": "cookie", Origin: "http://localhost:5173" };
+  const body = JSON.stringify({ email: user.email, password: "test-password" });
+  try {
+    const login = await fetch(base + "/login", { method: "POST", headers, body });
+    assert.equal(login.status, 200);
+    const cookie = login.headers.get("set-cookie");
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /Secure/);
+    assert.match(cookie, /SameSite=Lax/);
+    assert.match(cookie, /Path=\/api/);
+    assert.equal((await login.json()).data.token, undefined);
+    assert.equal(login.headers.get("access-control-allow-credentials"), "true");
+    const [credential, refreshCookie] = login.headers.getSetCookie().map((header) => header.split(";")[0]);
+    assert.match(refreshCookie, /^refresh_token=/);
+    const profile = await fetch(base + "/profile", { headers: { Cookie: credential } });
+    assert.equal(profile.status, 200);
+    assert.equal((await profile.json()).data.email, user.email);
+    const expired = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: -1 });
+    assert.equal((await fetch(base + "/profile", { headers: { Cookie: `access_token=${expired}` } })).status, 401);
+    assert.equal((await fetch(base + "/logout", { method: "POST", headers: { Cookie: credential } })).status, 403);
+    assert.equal((await fetch(base + "/login", { method: "POST", headers: { ...headers, Origin: "http://localhost:9999" }, body })).status >= 400, true);
+    const second = await fetch(base + "/login", { method: "POST", headers, body });
+    const otherDevice = second.headers.getSetCookie()[0].split(";")[0];
+    const list = await fetch(base + "/sessions", { headers: { Cookie: credential } });
+    assert.equal((await list.json()).data.length, 2);
+    const rotated = await fetch(base + "/refresh", { method: "POST", headers: { ...headers, Cookie: refreshCookie } });
+    assert.equal(rotated.status, 200);
+    const newCredential = rotated.headers.getSetCookie()[0].split(";")[0];
+    const replay = await fetch(base + "/refresh", { method: "POST", headers: { ...headers, Cookie: refreshCookie } });
+    assert.equal(replay.status, 401);
+    assert.equal((await fetch(base + "/profile", { headers: { Cookie: newCredential } })).status, 401);
+    assert.equal((await fetch(base + "/profile", { headers: { Cookie: otherDevice } })).status, 200);
+    const logout = await fetch(base + "/logout-all", { method: "POST", headers: { ...headers, Cookie: otherDevice } });
+    assert.equal(logout.status, 200);
+    assert.match(logout.headers.get("set-cookie"), /Expires=Thu, 01 Jan 1970/);
+    assert.equal((await fetch(base + "/profile", { headers: { Cookie: otherDevice } })).status, 401);
+    user.isActive = false;
+    assert.equal((await fetch(base + "/profile", { headers: { Cookie: credential } })).status, 403);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    mock.restoreAll();
+    await db.stop();
+  }
+});

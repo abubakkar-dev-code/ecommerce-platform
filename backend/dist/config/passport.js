@@ -7,6 +7,7 @@ const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
 const env_1 = require("./env");
 const user_model_1 = __importDefault(require("../models/user.model"));
+const api_error_1 = __importDefault(require("../utils/api-error"));
 passport_1.default.use(new passport_google_oauth20_1.Strategy({
     clientID: env_1.env.CLIENT_ID,
     clientSecret: env_1.env.CLIENT_SECRET,
@@ -24,6 +25,9 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
                 googleId,
             });
             return done(null, newUser);
+        }
+        if (user.isActive !== true) {
+            return done(new api_error_1.default(403, "Account is disabled"));
         }
         return done(null, user);
     }

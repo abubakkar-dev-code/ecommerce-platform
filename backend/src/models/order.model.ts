@@ -5,6 +5,10 @@ interface IOrderItem {
   varient: mongoose.Types.ObjectId;
   quantity: number;
   price: number;
+  productName?: string;
+  image?: string;
+  sku?: string;
+  attributes?: Record<string, string>;
 }
 
 interface IShippingAddress {
@@ -20,6 +24,10 @@ interface IShippingAddress {
 
 interface IOrder extends Document {
   user: mongoose.Types.ObjectId;
+  checkoutKey?: string;
+  checkoutSource?: "cart" | "buy-now";
+  paymentMethod?: "razorpay" | "cod";
+  checkoutAddress?: mongoose.Types.ObjectId;
   items: IOrderItem[];
   shippingAddress: IShippingAddress;
   subtotal: number;
@@ -40,6 +48,10 @@ const orderItemSchema = new Schema<IOrderItem>({
     ref: "Varient",
     required: true,
   },
+  productName: String,
+  image: String,
+  sku: String,
+  attributes: { type: Map, of: String },
   quantity: {
     type: Number,
     required: true,
@@ -94,6 +106,9 @@ const orderSchema = new Schema<IOrder>(
       required: true,
     },
 
+    checkoutSource: { type: String, enum: ["cart", "buy-now"] },
+    checkoutKey: { type: String, select: false },
+    checkoutAddress: { type: Schema.Types.ObjectId, select: false },
     items: {
       type: [orderItemSchema],
       required: true,
@@ -123,6 +138,7 @@ const orderSchema = new Schema<IOrder>(
       min: 0,
     },
 
+    paymentMethod: { type: String, enum: ["razorpay", "cod"], default: "razorpay" },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
@@ -138,6 +154,8 @@ const orderSchema = new Schema<IOrder>(
         "shipped",
         "delivered",
         "cancelled",
+        "expired",
+        "payment_review",
       ],
       default: "pending",
     },
@@ -146,6 +164,8 @@ const orderSchema = new Schema<IOrder>(
     timestamps: true,
   },
 );
+
+orderSchema.index({ user: 1, checkoutKey: 1 }, { unique: true, partialFilterExpression: { checkoutKey: { $type: "string" } } });
 
 const Order = mongoose.model<IOrder>("Order", orderSchema);
 

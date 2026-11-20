@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import ApiError from "../utils/api-error";
 import Brand from "../models/brand.model";
 import ApiResponse from "../utils/api-response";
+import { brandCreate, brandUpdate, catalogError, objectId, pageQuery, parse } from "../validation/catalog.validation";
 
 export const createBrand = async (
   req: Request,
@@ -9,8 +10,7 @@ export const createBrand = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { name, slug, description, logo } = req.body;
-    console.log(req.body);
+    const { name, slug, description, logo, isActive } = parse(brandCreate, req.body);
     if (!name || !slug) {
       throw new ApiError(400, "name and slug are required");
     }
@@ -23,27 +23,32 @@ export const createBrand = async (
       slug,
       description,
       logo,
+      isActive,
     });
     res.status(201).json(new ApiResponse("Brand created successfully", brand));
   } catch (error) {
-    next(error);
+    next(catalogError(error));
   }
 };
 export const getBrands = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const brands = await Brand.find();
+    const query = parse(pageQuery, req.query);
+    const [brands, totalProducts] = await Promise.all([
+      Brand.find({ isActive: true }).sort({ name: 1, _id: 1 }).skip((query.page - 1) * query.limit).limit(query.limit),
+      Brand.countDocuments({ isActive: true }),
+    ]);
     if (!brands) {
       throw new ApiError(404, "No brands found for this category");
     }
     res
       .status(200)
-      .json(new ApiResponse("Brands details fetched successfully", brands));
+      .json(new ApiResponse("Brands details fetched successfully", brands, { currentPage: query.page, totalPages: Math.ceil(totalProducts / query.limit), itemsPerPage: query.limit, totalProducts }));
   } catch (error) {
-    next(error);
+    next(catalogError(error));
   }
 };
 export const getBrandById = async (
@@ -52,14 +57,14 @@ export const getBrandById = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const id = parse(objectId, req.params.id);
     const brand = await Brand.findById(id);
-    if (!brand) {
+    if (!brand || !brand.isActive) {
       throw new ApiError(404, "Brand not found");
     }
     res.status(200).json(new ApiResponse("Brand fetched successfully", brand));
   } catch (error) {
-    next(error);
+    next(catalogError(error));
   }
 };
 export const updateBrand = async (
@@ -68,9 +73,9 @@ export const updateBrand = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = parse(objectId, req.params.id);
 
-    const { name, slug, description, logo, isActive } = req.body;
+    const { name, slug, description, logo, isActive } = parse(brandUpdate, req.body);
 
     const brand = await Brand.findById(id);
 
@@ -98,7 +103,7 @@ export const updateBrand = async (
 
     res.status(200).json(new ApiResponse("Brand updated successfully", brand));
   } catch (error) {
-    next(error);
+    next(catalogError(error));
   }
 };
 
@@ -108,7 +113,7 @@ export const deleteBrand = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = parse(objectId, req.params.id);
 
     const brand = await Brand.findById(id);
 
@@ -128,6 +133,6 @@ export const deleteBrand = async (
       .status(200)
       .json(new ApiResponse("Brand deactivated successfully", brand));
   } catch (error) {
-    next(error);
+    next(catalogError(error));
   }
 };

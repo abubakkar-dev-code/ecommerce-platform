@@ -1,15 +1,16 @@
 import mongoose from "mongoose";
 import { env } from "./env";
 
-
-const connectDb = async (): Promise<void> => {
+export default async function connectDb() {
+  await mongoose.connect(env.mongodbUri, { serverSelectionTimeoutMS: 10_000 });
   try {
-    await mongoose.connect(env.mongodbUri);
-    console.log("mongo db connected successfully");
+    const topology = await mongoose.connection.db!.admin().command({ hello: 1 });
+    if (!topology.setName && topology.msg !== "isdbgrid") {
+      throw new Error("A replica set or sharded MongoDB deployment is required");
+    }
   } catch (error) {
-    console.log("mongo db connection failed", (error as Error).message);
-    process.exit(1)
+    await mongoose.disconnect();
+    throw error;
   }
-};
-
-export default connectDb
+  console.info("MongoDB connected");
+}

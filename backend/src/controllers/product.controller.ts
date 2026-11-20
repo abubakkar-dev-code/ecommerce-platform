@@ -1,421 +1,65 @@
 import { NextFunction, Request, Response } from "express";
-import ApiError from "../utils/api-error";
 import Product from "../models/product.model";
 import Category from "../models/category.model";
-import Brand from "../models/brand.model";
+import ApiError from "../utils/api-error";
 import ApiResponse from "../utils/api-response";
-import Varient from "../models/productVariant.model";
-import ProductImage from "../models/productImageSchema";
+import { listProducts, requireActiveParents } from "../services/catalog.service";
+import { catalogError, catalogQuery, objectId, parse, productCreate, productUpdate } from "../validation/catalog.validation";
 
-export const createProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const createProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, slug, description, category, brand } = req.body;
-    if (!name || !slug || !category || !brand) {
-      throw new ApiError(400, "name and slugs are required feilds");
-    }
-    const existingProduct = await Product.findOne({ slug });
-    if (existingProduct) {
-      throw new ApiError(
-        400,
-        "A product with same slug already exist,It must be unique",
-      );
-    }
-    const existingCategory = await Category.findById(category);
-    if (!existingCategory) {
-      throw new ApiError(404, "Category not found");
-    }
-    if (!existingCategory.isActive) {
-      throw new ApiError(
-        409,
-        "We can't able to add create the products under the Inactive category",
-      );
-    }
-    const existingBrand = await Brand.findById(brand);
-    if (!existingBrand) {
-      throw new ApiError(404, "Brand not found");
-    }
-    if (!existingBrand.isActive) {
-      throw new ApiError(
-        409,
-        "Brand is inactive,please use the valid or active Brand",
-      );
-    }
-    const product = await Product.create({
-      name,
-      slug,
-      description,
-      category,
-      brand,
-    });
-    res
-      .status(201)
-      .json(new ApiResponse("Product created successfully", product));
-  } catch (error) {
-    next(error);
-  }
-};
-export const getProducts = async (
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const products = await Product.find();
-
-    if (products.length === 0) {
-      throw new ApiError(404, "There are no products");
-    }
-
-    const productsWithDetails = await Promise.all(
-      products.map(async (product) => {
-        const variants = await Varient.find({
-          product: product._id,
-          isActive: true,
-        });
-        const images = await ProductImage.find({
-          product: product._id,
-          isActive: true,
-        }).sort({ sortOrder: 1 });
-
-        return {
-          ...product.toObject(),
-          variants,
-          images
-        }
-      }),
-    );
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse("Products fetched successfully", productsWithDetails),
-      );
-  } catch (error) {
-    next(error);
-  }
+    const body = parse(productCreate, req.body);
+    await requireActiveParents(body.category, body.brand);
+    const product = await Product.create(body);
+    res.status(201).json(new ApiResponse("Product created successfully", product));
+  } catch (error) { next(catalogError(error)); }
 };
 
-export const searchProducts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+const list = async (req: Request, res: Response, next: NextFunction, searchRequired = false) => {
   try {
-    const { search } = req.query as { search?: string };
-    if (!search) {
-      throw new ApiError(400, "please provide the search value");
-    }
-    const brands = await Brand.find({
-      name: {
-        $regex: search,
-        $options: "i",
-      },
-    });
-    if (!brands) {
-      throw new ApiError(404, "brand not found");
-    }
-    const brandIds = brands.map((brand) => brand.id);
-    const categories = await Category.find({
-      name: {
-        $regex: search,
-        $options: "i",
-      },
-    });
-    if (!categories) {
-      throw new ApiError(404, "category not found");
-    }
-    const categoryIds = categories.map((category) => category.id);
-
-    const products = await Product.find({
-      isActive: true,
-      $or: [
-        {
-          name: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          slug: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          description: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          brand: {
-            $in: brandIds,
-          },
-        },
-        {
-          category: {
-            $in: categoryIds,
-          },
-        },
-      ],
-    });
-    res
-      .status(200)
-      .json(new ApiResponse("Products fetched successfully", products));
-  } catch (error) {
-    next(error);
-  }
+    const query = parse(catalogQuery, req.query);
+    if (searchRequired && !query.search) throw new ApiError(400, "please provide the search value");
+    // Parse original string query once in the service; transformed values stay internal.
+    const result = await listProducts(req.query);
+    res.status(200).json({ ...new ApiResponse("Products fetched successfully", result.data, result.pagination), brandIds: result.brandIds });
+  } catch (error) { next(catalogError(error)); }
 };
-export const getSingleProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { id } = req.params;
+export const getProducts = (req: Request, res: Response, next: NextFunction) => list(req, res, next);
+export const searchProducts = (req: Request, res: Response, next: NextFunction) => list(req, res, next, true);
+export const filterProducts = (req: Request, res: Response, next: NextFunction) => list(req, res, next);
 
+export const getSingleProduct = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parse(objectId, req.params.id);
+    const result = await listProducts({}, id);
+    const product = result.data[0];
+    if (!product) throw new ApiError(404, "Product not found");
+    const category = await Category.findById(product.category);
+    res.status(200).json(new ApiResponse("Product fetched successfully", { ...product, categories: category, brand: product.brandDetails }));
+  } catch (error) { next(catalogError(error)); }
+};
+
+export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parse(objectId, req.params.id);
+    const body = parse(productUpdate, req.body);
     const product = await Product.findById(id);
-
-    if (!product) {
-      throw new ApiError(404, "Product not found");
+    if (!product) throw new ApiError(404, "No Product found");
+    // Validate unchanged relationships too when publishing an existing product.
+    if ((body.isActive ?? product.isActive) || body.category || body.brand) {
+      await requireActiveParents(body.category ?? String(product.category), body.brand ?? String(product.brand));
     }
-
-    const variants = await Varient.find({
-      product: product._id,
-      isActive: true,
-    });
-
-    const images = await ProductImage.find({
-      product: product._id,
-      isActive: true,
-    }).sort({ sortOrder: 1 });
-    console.log(product, "product");
-    const categories = await Category.findOne({
-      _id: product.category,
-      isActive: true,
-    });
-    const brand = await Brand.findOne({
-      _id: product.brand,
-      isActive: true,
-    });
-
-    const productWithDetails = {
-      ...product.toObject(),
-      variants,
-      images,
-      categories,
-      brand,
-    };
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse("Product fetched successfully", productWithDetails),
-      );
-  } catch (error) {
-    next(error);
-  }
-};
-export const updateProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { id } = req.params;
-    const { name, slug, description, category, brand } = req.body;
-    if (!name && !slug && !description && !category && !brand) {
-      throw new ApiError(
-        400,
-        "name,slug,description,category and brand are required fields",
-      );
-    }
-    const product = await Product.findById(id);
-    if (!product) {
-      throw new ApiError(404, "No Product found");
-    }
-    product.name = name ?? product.name;
-    product.slug = slug ?? product.slug;
-    product.description = description ?? product.description;
-    product.category = category ?? product.category;
-    product.brand = brand ?? product.brand;
+    Object.assign(product, body);
     await product.save();
-    res
-      .status(201)
-      .json(new ApiResponse("Product updated successfully", product));
-  } catch (error) {
-    next(error);
-  }
+    res.status(201).json(new ApiResponse("Product updated successfully", product));
+  } catch (error) { next(catalogError(error)); }
 };
-export const deleteProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const deleteProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    const product = await Product.findById(id);
-    if (!product) {
-      throw new ApiError(404, "Product not found");
-    }
-    if (!product.isActive) {
-      throw new ApiError(400, "Product already in deactivated state");
-    }
+    const product = await Product.findById(parse(objectId, req.params.id));
+    if (!product) throw new ApiError(404, "Product not found");
     product.isActive = false;
     await product.save();
-    res
-      .status(201)
-      .json(new ApiResponse("Product deactivated successfully", product));
-  } catch (error) {
-    next(error);
-  }
-};
-export const filterProducts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const {
-      brand,
-      category,
-      minPrice,
-      maxPrice,
-      sort,
-      page = "1",
-      limit = "10",
-    } = req.query as {
-      brand?: string;
-      category?: string;
-      minPrice?: string;
-      maxPrice?: string;
-      sort?: string;
-      page?: string;
-      limit?: string;
-    };
-
-    const min = minPrice ? Number(minPrice) : undefined;
-    const max = maxPrice ? Number(maxPrice) : undefined;
-    const filter: any = {
-      isActive: true,
-    };
-
-    if (brand) {
-      filter.brand = brand;
-    }
-
-    if (category) {
-      filter.category = category;
-    }
-    const variantFilter: any = {
-      isActive: true,
-    };
-
-    if (min !== undefined || max !== undefined) {
-      variantFilter.price = {};
-    }
-
-    if (min !== undefined) {
-      variantFilter.price.$gte = min;
-    }
-
-    if (max !== undefined) {
-      variantFilter.price.$lte = max;
-    }
-
-    const matchedVariants = await Varient.find(variantFilter).select("product");
-
-    const productIds = matchedVariants.map((variant) => variant.product);
-
-    if (min !== undefined || max !== undefined) {
-      if (productIds.length === 0) {
-        return res.status(200).json(
-          new ApiResponse("Products filtered successfully", [], {
-            currentPage: Number(page),
-            totalPages: 0,
-            itemsPerPage: Number(limit),
-            totalProducts: 0,
-          }),
-        );
-      }
-
-      filter._id = {
-        $in: productIds,
-      };
-    }
-    const sortOption: any = {};
-
-    if (sort === "name-asc") {
-      sortOption.name = 1;
-    }
-
-    if (sort === "name-dsc") {
-      sortOption.name = -1;
-    }
-
-    if (sort === "newest") {
-      sortOption.createdAt = -1;
-    }
-
-    if (sort === "oldest") {
-      sortOption.createdAt = 1;
-    }
-
-    const currentPage = Math.max(Number(page), 1);
-    const itemsPerPage = Math.max(Number(limit), 1);
-
-    const skip = (currentPage - 1) * itemsPerPage;
-
-    const totalProducts = await Product.countDocuments(filter);
-
-    const totalPages = Math.ceil(totalProducts / itemsPerPage);
-
-    const products = await Product.find(filter)
-      .sort(sortOption)
-      .skip(skip)
-      .limit(itemsPerPage);
-
-    const productsWithDetails = await Promise.all(
-      products.map(async (product) => {
-        const variants = await Varient.find({
-          product: product._id,
-          isActive: true,
-        });
-
-        const images = await ProductImage.find({
-          product: product._id,
-          isActive: true,
-        }).sort({ sortOrder: 1 });
-
-        return {
-          ...product.toObject(),
-          variants,
-          images,
-        };
-      }),
-    );
-
-    const pagination = {
-      currentPage,
-      totalPages,
-      itemsPerPage,
-      totalProducts,
-    };
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          "Products filtered successfully",
-          productsWithDetails,
-          pagination,
-        ),
-      );
-  } catch (error) {
-    next(error);
-  }
+    res.status(201).json(new ApiResponse("Product deactivated successfully", product));
+  } catch (error) { next(catalogError(error)); }
 };

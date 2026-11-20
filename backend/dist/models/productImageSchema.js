@@ -34,30 +34,35 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const productImageSchema = new mongoose_1.Schema({
+const productImageSchema = new mongoose_1.default.Schema({
     product: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Product",
         required: true,
     },
-    image: {
+    primaryImage: {
         type: String,
-        required: true,
     },
-    isPrimary: {
-        type: Boolean,
-        default: false,
+    primaryPublicId: {
+        type: String,
     },
-    sortOrder: {
-        type: Number,
-        default: 0,
-    },
+    thumbnails: [
+        {
+            url: {
+                type: String,
+                required: true,
+            },
+            publicId: {
+                type: String,
+                required: true,
+            },
+        },
+    ],
     isActive: {
         type: Boolean,
         default: true,
     },
-}, {
-    timestamps: true,
-});
-const ProductImage = mongoose_1.default.model("ProductImage", productImageSchema);
+}, { timestamps: true, optimisticConcurrency: true });
+productImageSchema.index({ product: 1 }, { unique: true });
+const ProductImage = mongoose_1.default.model("productImage", productImageSchema);
 exports.default = ProductImage;

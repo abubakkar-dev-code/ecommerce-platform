@@ -66,3 +66,12 @@ export const passwordResetLink = async (
     `,
   });
 };
+
+export async function verificationEmail(email: string, link: string) {
+  await transporter.sendMail({
+    from: env.MAIL_FROM,
+    to: email,
+    subject: "Verify your Nexora email",
+    text: `Verify your email within 30 minutes: ${link}`,
+  });
+}

@@ -1,4 +1,4 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, type Document } from "mongoose";
 interface Thumbnail {
   url: string;
   publicId: string;
@@ -14,12 +14,11 @@ const productImageSchema = new mongoose.Schema<IproductImage>(
   {
     product: {
       type: Schema.Types.ObjectId,
-      ref: "Products",
+      ref: "Product",
       required: true,
     },
     primaryImage: {
       type: String,
-     
     },
     primaryPublicId: {
       type: String,
@@ -41,8 +40,9 @@ const productImageSchema = new mongoose.Schema<IproductImage>(
       default: true,
     },
   },
-  { timestamps: true },
+  { timestamps: true, optimisticConcurrency: true },
 );
+productImageSchema.index({ product: 1 }, { unique: true });
 
 const ProductImage = mongoose.model<IproductImage>(
   "productImage",

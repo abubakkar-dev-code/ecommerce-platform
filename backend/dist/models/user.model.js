@@ -49,6 +49,7 @@ const userSchema = new mongoose_1.Schema({
     },
     password: {
         type: String,
+        select: false,
         required: false,
         minLength: 8,
     },
@@ -63,6 +64,7 @@ const userSchema = new mongoose_1.Schema({
     },
     googleId: {
         type: String,
+        select: false,
         unique: true,
         sparse: true,
     },

@@ -3,12 +3,13 @@ import mongoose, { Document, Schema } from "mongoose";
 interface IPayment extends Document {
   user: mongoose.Types.ObjectId;
   order: mongoose.Types.ObjectId;
-  razorpayOrderId: string;
+  razorpayOrderId?: string;
+  checkoutManaged?: boolean;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
   amount: number;
   currency: string;
-  status: "created" | "paid" | "failed";
+  status: "initializing" | "provider_review" | "created" | "paid" | "failed";
 }
 
 const paymentSchema = new Schema<IPayment>(
@@ -25,10 +26,8 @@ const paymentSchema = new Schema<IPayment>(
       required: true,
     },
 
-    razorpayOrderId: {
-      type: String,
-      required: true,
-    },
+    checkoutManaged: { type: Boolean },
+    razorpayOrderId: { type: String, index: true },
 
     razorpayPaymentId: {
       type: String,
@@ -51,12 +50,14 @@ const paymentSchema = new Schema<IPayment>(
 
     status: {
       type: String,
-      enum: ["created", "paid", "failed"],
+      enum: ["initializing", "provider_review", "created", "paid", "failed"],
       default: "created",
     },
   },
   { timestamps: true },
 );
+
+paymentSchema.index({ order: 1 }, { unique: true, partialFilterExpression: { checkoutManaged: true } });
 
 const Payment = mongoose.model<IPayment>("Payment", paymentSchema);
 
